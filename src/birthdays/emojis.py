@@ -97,3 +97,11 @@ TRAVEL_AND_PLACES = (
     '🚀', '🛸'
 )
 # fmt:on
+
+ALL_EMOJIS = (
+    POSITIVE_FACES
+    + ANIMALS_AND_NATURE
+    + FOOD_AND_DRINK
+    + ACTIVITIES
+    + TRAVEL_AND_PLACES
+)
