@@ -32,21 +32,49 @@ class BirthdayEntry:
     year: Optional[int] = None
     notes: Optional[str] = None
 
+    def is_today(self) -> bool:
+        today = datetime.date.today()
+        return self.month == today.month and self.day == today.day
+
     def get_next_occurrence(self, from_date: datetime.date) -> datetime.date:
         """Calculate the exact date of the next birthday."""
-        ...
+        if from_date.month <= self.month and from_date.day < self.day:
+            return datetime.date(from_date.year, self.month, self.day)
+        return datetime.date(from_date.year, self.month, self.day) + relativedelta(
+            years=1
+        )
 
     def get_prev_occurrence(self, from_date: datetime.date) -> datetime.date:
         """Calculate the exact date of the previous birthday."""
-        ...
+        if from_date.month <= self.month and from_date.day <= self.day:
+            return datetime.date(from_date.year, self.month, self.day) - relativedelta(
+                years=1
+            )
+        return datetime.date(from_date.year, self.month, self.day)
 
     def next_occurrence_in(self, from_date: datetime.date) -> relativedelta:
         """Calculate the exact distance to the next birthday."""
-        ...
+        return relativedelta(self.get_next_occurrence(from_date), from_date)
 
     def prev_occurrence_in(self, from_date: datetime.date) -> relativedelta | None:
         """Calculate the exact distance to the previous birthday."""
-        ...
+        return relativedelta(self.get_prev_occurrence(from_date), from_date)
+
+    def __lt__(self, other: "BirthdayEntry | datetime.date") -> bool:
+        year_check = self.year is None or other.year is None or self.year <= other.year
+        return year_check and self.month <= other.month and self.day < other.day
+
+    def __gt__(self, other: "BirthdayEntry | datetime.date") -> bool:
+        year_check = self.year is None or other.year is None or self.year >= other.year
+        return year_check and self.month >= other.month and self.day > other.day
+
+    def __le__(self, other: "BirthdayEntry | datetime.date") -> bool:
+        year_check = self.year is None or other.year is None or self.year <= other.year
+        return year_check and self.month <= other.month and self.day <= other.day
+
+    def __ge__(self, other: "BirthdayEntry | datetime.date") -> bool:
+        year_check = self.year is None or other.year is None or self.year >= other.year
+        return year_check and self.month >= other.month and self.day >= other.day
 
 
 # ==========================================
