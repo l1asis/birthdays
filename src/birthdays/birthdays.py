@@ -9,6 +9,8 @@ import quopri
 import base64
 import uuid
 import calendar
+import os
+from platformdirs import user_data_path
 
 
 VCARD = re.compile(r"BEGIN:VCARD.*?END:VCARD", flags=re.DOTALL | re.IGNORECASE)
@@ -83,8 +85,18 @@ class BirthdayEntry:
 
 
 def get_database_path() -> Path:
-    """Resolve OS-specific config path (e.g., ~/.config/birthdays/db.json)."""
-    ...
+    """Resolve OS-specific config path."""
+    if custom_path := os.getenv("BIRTHDAYS_HOME"):
+        path = Path(custom_path)
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    # TODO: Replace with __init__.py variable:
+    return user_data_path(
+        "birthdays",
+        "Volodymyr Horshenin (@l1asis)",
+        ensure_exists=True,
+    )
 
 
 def load_database(db_path: Path) -> List[BirthdayEntry]:
