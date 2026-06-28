@@ -34,50 +34,93 @@ class BirthdayEntry:
     year: Optional[int] = None
     notes: Optional[str] = None
 
-    def is_today(self) -> bool:
+    def get_age(self, leap_system: Literal["after", "before"] = "before") -> int | None:
+        """Return the person's current age, or None if the year is unknown."""
+        if self.year is None:
+            return None
         today = datetime.date.today()
-        return self.month == today.month and self.day == today.day
+        this_year = leapling_safe_date(today.year, self.month, self.day, leap_system)
+        had_birthday = today >= this_year
+        return today.year - self.year - (0 if had_birthday else 1)
 
-    def get_next_occurrence(self, from_date: datetime.date) -> datetime.date:
+    def is_today(self, leap_system: Literal["after", "before"] = "before") -> bool:
+        """Check if today is the person's birthday."""
+        today = datetime.date.today()
+        this_year = leapling_safe_date(today.year, self.month, self.day, leap_system=leap_system)
+        return this_year.month == today.month and this_year.day == today.day
+
+    def get_next_occurrence(self, from_date: datetime.date, leap_system: Literal["after", "before"] = "before") -> datetime.date:
         """Calculate the exact date of the next birthday."""
-        if from_date.month <= self.month and from_date.day < self.day:
-            return datetime.date(from_date.year, self.month, self.day)
-        return datetime.date(from_date.year, self.month, self.day) + relativedelta(
-            years=1
+        this_year = leapling_safe_date(from_date.year, self.month, self.day, leap_system)
+        if from_date.month < this_year.month or (from_date.month == this_year.month and from_date.day < this_year.day):
+            return this_year
+        return leapling_safe_date(from_date.year + 1, self.month, self.day, leap_system)
+
+    def get_prev_occurrence(self, from_date: datetime.date, leap_system: Literal["after", "before"] = "before") -> datetime.date:
+        """Calculate the exact date of the previous birthday."""
+        this_year = leapling_safe_date(from_date.year, self.month, self.day, leap_system)
+        if from_date.month < this_year.month or (from_date.month == this_year.month and from_date.day < this_year.day):
+            return leapling_safe_date(from_date.year - 1, self.month, self.day, leap_system)
+        return this_year
+
+    def next_occurrence_in(self, from_date: datetime.date, leap_system: Literal["after", "before"] = "before") -> relativedelta:
+        """Calculate the exact distance to the next birthday."""
+        return relativedelta(self.get_next_occurrence(from_date, leap_system), from_date)
+
+    def prev_occurrence_in(self, from_date: datetime.date, leap_system: Literal["after", "before"] = "before") -> relativedelta:
+        """Calculate the exact distance to the previous birthday."""
+        return relativedelta(self.get_prev_occurrence(from_date, leap_system), from_date)
+
+    def __post_init__(self):
+        if not day_might_exist(self.year, self.month, self.day):
+            raise ValueError(
+                f"Date is out of range. "
+                f"Got: {f'{self.year}-' if self.year is not None else ''}"
+                f"{self.month}-{self.day}"
+            )
+
+    def __str__(self) -> str:
+        year_str = f"{self.year}-" if self.year else ""
+        date_str = f"{year_str}{self.month:02d}-{self.day:02d}"
+        
+        base = f"{self.full_name} ({date_str})"
+        if self.notes:
+            base = f"{base} - {self.notes}"
+        return base
+    
+    def __repr__(self) -> str:
+        return (
+            f"BirthdayEntry({repr(self.id)}, "
+            f"{repr(self.full_name)}, "
+            f"{self.month}, "
+            f"{self.day}, "
+            f"{self.year}, "
+            f"{repr(self.notes) if self.notes else 'None'})"
         )
 
-    def get_prev_occurrence(self, from_date: datetime.date) -> datetime.date:
-        """Calculate the exact date of the previous birthday."""
-        if from_date.month <= self.month and from_date.day <= self.day:
-            return datetime.date(from_date.year, self.month, self.day) - relativedelta(
-                years=1
-            )
-        return datetime.date(from_date.year, self.month, self.day)
-
-    def next_occurrence_in(self, from_date: datetime.date) -> relativedelta:
-        """Calculate the exact distance to the next birthday."""
-        return relativedelta(self.get_next_occurrence(from_date), from_date)
-
-    def prev_occurrence_in(self, from_date: datetime.date) -> relativedelta | None:
-        """Calculate the exact distance to the previous birthday."""
-        return relativedelta(self.get_prev_occurrence(from_date), from_date)
-
     def __lt__(self, other: "BirthdayEntry | datetime.date") -> bool:
-        year_check = self.year is None or other.year is None or self.year <= other.year
-        return year_check and self.month <= other.month and self.day < other.day
+        if self.year is not None and other.year is not None:
+            if self.year != other.year:
+                return self.year < other.year
+        return self.month < other.month or (self.month == other.month and self.day < other.day)
 
     def __gt__(self, other: "BirthdayEntry | datetime.date") -> bool:
-        year_check = self.year is None or other.year is None or self.year >= other.year
-        return year_check and self.month >= other.month and self.day > other.day
+        if self.year is not None and other.year is not None:
+            if self.year != other.year:
+                return self.year > other.year
+        return self.month > other.month or (self.month == other.month and self.day > other.day)
 
     def __le__(self, other: "BirthdayEntry | datetime.date") -> bool:
-        year_check = self.year is None or other.year is None or self.year <= other.year
-        return year_check and self.month <= other.month and self.day <= other.day
+        if self.year is not None and other.year is not None:
+            if self.year != other.year:
+                return self.year < other.year
+        return self.month < other.month or (self.month == other.month and self.day <= other.day)
 
     def __ge__(self, other: "BirthdayEntry | datetime.date") -> bool:
-        year_check = self.year is None or other.year is None or self.year >= other.year
-        return year_check and self.month >= other.month and self.day >= other.day
-
+        if self.year is not None and other.year is not None:
+            if self.year != other.year:
+                return self.year > other.year
+        return self.month > other.month or (self.month == other.month and self.day >= other.day)
 
 # ==========================================
 #               STORAGE APIs
@@ -112,6 +155,18 @@ def save_database(entries: List[BirthdayEntry], db_path: Path) -> None:
 # ==========================================
 #            CORE LOGIC APIs
 # ==========================================
+
+
+def leapling_safe_date(year: int, month: int, day: int, leap_system: Literal["after", "before"] = "before") -> datetime.date:
+    if not is_leap(year) and month == 2 and day == 29:
+        if leap_system == "before":
+            return datetime.date(year, 2, 28)
+        return datetime.date(year, 3, 1)
+    return datetime.date(year, month, day)
+
+
+def is_leap(year: int) -> bool:
+    return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
 
 
 def day_might_exist(year: int | None, month: int, day: int) -> bool:
@@ -288,4 +343,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    birthday_entry = BirthdayEntry("", "Max Mustermann", 2, 29, 2024)
+    print(birthday_entry.is_today())
