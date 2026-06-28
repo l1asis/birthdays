@@ -203,7 +203,9 @@ def day_might_exist(year: int | None, month: int, day: int) -> bool:
     return 1 <= day <= num_days
 
 
-def parse_vcards(vcf_file: Path) -> List[BirthdayEntry]:
+def parse_vcards(
+    vcf_file: Path, leap_system: Literal["after", "before"]
+) -> List[BirthdayEntry]:
     """Extract names and birthdays from all vCard formats."""
     with open(vcf_file, "r", encoding="utf-8") as file:
         vcards: list[str] = VCARD.findall(file.read())
@@ -254,6 +256,7 @@ def parse_vcards(vcf_file: Path) -> List[BirthdayEntry]:
                             month,
                             day,
                             year,
+                            leap_system,
                         )
                     )
 
@@ -323,6 +326,12 @@ def setup_parser() -> argparse.ArgumentParser:
     parser_add.add_argument("name", type=str, help="Full name of the person")
     parser_add.add_argument("date", type=str, help="Birthday (YYYY-MM-DD | MM-DD)")
     parser_add.add_argument("--note", type=str, help="Optional note to attach")
+    parser_add.add_argument(
+        "--leap-system",
+        choices=["before", "after"],
+        default="before",
+        help="When leaplings celebrate in non-leap years (default: before)",
+    )
 
     parser_edit = subparsers.add_parser("edit", help="Modify an existing entry")
     parser_edit.add_argument("identifier", type=str, help="Name or UUID of the person")
@@ -331,6 +340,11 @@ def setup_parser() -> argparse.ArgumentParser:
         "--date", type=str, help="Update the birthday (YYYY-MM-DD | MM-DD)"
     )
     parser_edit.add_argument("--note", type=str, help="Update the attached note")
+    parser_edit.add_argument(
+        "--leap-system",
+        choices=["before", "after"],
+        help="Update when this leapling celebrates in non-leap years",
+    )
 
     parser_delete = subparsers.add_parser("delete", help="Delete an entry")
     parser_delete.add_argument(
@@ -349,6 +363,12 @@ def setup_parser() -> argparse.ArgumentParser:
         "--yes",
         action="store_true",
         help="Skip interactive collision prompts and auto-merge safe entries",
+    )
+    parser_import.add_argument(
+        "--leap-system",
+        choices=["before", "after"],
+        default="before",
+        help="Default leap system to assign to imported contacts",
     )
 
     return parser
