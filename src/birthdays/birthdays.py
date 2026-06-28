@@ -82,6 +82,60 @@ def day_might_exist(year: int | None, month: int, day: int) -> bool:
 
 def parse_vcards(vcf_file: Path) -> List[BirthdayEntry]:
     """Extract names and birthdays from all vCard formats."""
+    with open(vcf_file, "r", encoding="utf-8") as file:
+        vcards: list[str] = VCARD.findall(file.read())
+
+    birthdays: List[BirthdayEntry] = []
+
+    for vcard in vcards:
+        fn_match = FULL_NAME.search(vcard)
+        bday_match = BIRTHDAY.search(vcard)
+
+        if fn_match is not None:
+            parameters = fn_match.group(1)
+            full_name = fn_match.group(2)
+
+            if parameters:
+                if "ENCODING=QUOTED-PRINTABLE" in parameters:
+                    unquoted = quopri.decodestring(full_name)
+                    if "CHARSET=UTF-8" in parameters:
+                        full_name = unquoted.decode("utf-8")
+                elif "ENCODING=b" in parameters:
+                    unbased = base64.standard_b64decode(full_name)
+                    if "CHARSET=UTF-8" in parameters:
+                        full_name = unbased.decode("utf-8")
+
+            if bday_match is not None:
+                date_str = bday_match.group(1)
+                year = month = day = None
+
+                try:
+                    date = datetime.date.fromisoformat(date_str)
+                    year, month, day = date.year, date.month, date.day
+
+                except ValueError:
+                    date_match = DATE.match(date_str)
+
+                    if date_match is not None:
+                        year, month, day = (
+                            int(date_match.group(1)),
+                            int(date_match.group(2)),
+                            int(date_match.group(3)),
+                        )
+
+                if month is not None and day is not None:
+                    birthdays.append(
+                        BirthdayEntry(
+                            uuid.uuid4().hex,
+                            full_name,
+                            month,
+                            day,
+                            year,
+                        )
+                    )
+
+    return birthdays
+
 
 def merge_entries(
     existing: List[BirthdayEntry],
