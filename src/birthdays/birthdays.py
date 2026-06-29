@@ -3,13 +3,14 @@ from pathlib import Path
 import datetime
 import re
 import argparse
-from typing import Optional, List, Literal
+from typing import Optional, List, Literal, Any
 from dateutil.relativedelta import relativedelta
 import quopri
 import base64
 import uuid
 import calendar
 import os
+import json
 from platformdirs import user_data_path
 
 
@@ -168,14 +169,41 @@ def get_database_path() -> Path:
     )
 
 
+def as_birthday_entry(dictionary: dict[str, Any]) -> BirthdayEntry:
+    """Read a JSON dictionary and safely convert it into BirthdayEntry."""
+    return BirthdayEntry(
+        dictionary["id"],
+        dictionary["full_name"],
+        dictionary["month"],
+        dictionary["day"],
+        dictionary.get("year"),
+        dictionary.get("notes"),
+        dictionary.get("leap_system", "before"),
+    )
+
+
 def load_database(db_path: Path) -> List[BirthdayEntry]:
     """Read the JSON file and inflate it into BirthdayEntry objects."""
-    ...
+    with open(db_path, "r", encoding="utf-8") as file:
+        return json.load(file, object_hook=as_birthday_entry)
 
 
 def save_database(entries: List[BirthdayEntry], db_path: Path) -> None:
     """Serialize BirthdayEntry objects and write them to the JSON file."""
-    ...
+    dictionaries: tuple[dict[str, Any], ...] = tuple(
+        {
+            "id": entry.id,
+            "full_name": entry.full_name,
+            "month": entry.month,
+            "day": entry.day,
+            "year": entry.year,
+            "notes": entry.notes,
+            "leap_system": entry.leap_system,
+        }
+        for entry in entries
+    )
+    with open(db_path, "w", encoding="utf-8") as file:
+        json.dump(dictionaries, file, indent=4)
 
 
 # ==========================================
