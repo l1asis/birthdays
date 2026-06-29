@@ -1,18 +1,18 @@
+import argparse
+import base64
+import calendar
+import datetime
+import json
+import os
+import quopri
+import re
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
-import datetime
-import re
-import argparse
-from typing import Optional, List, Literal, Any
-from dateutil.relativedelta import relativedelta
-import quopri
-import base64
-import uuid
-import calendar
-import os
-import json
-from platformdirs import user_data_path
+from typing import Any, List, Literal, Optional
 
+from dateutil.relativedelta import relativedelta
+from platformdirs import user_data_path
 
 VCARD = re.compile(r"BEGIN:VCARD.*?END:VCARD", flags=re.DOTALL | re.IGNORECASE)
 FULL_NAME = re.compile(r"^FN(;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE)
