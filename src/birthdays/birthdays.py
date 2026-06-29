@@ -7,7 +7,7 @@ import os
 import quopri
 import re
 import uuid
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, List, Literal, Optional
 
@@ -184,24 +184,16 @@ def as_birthday_entry(dictionary: dict[str, Any]) -> BirthdayEntry:
 
 def load_database(db_path: Path) -> List[BirthdayEntry]:
     """Read the JSON file and inflate it into BirthdayEntry objects."""
+    if not db_path.exists():
+        return []
+
     with open(db_path, "r", encoding="utf-8") as file:
         return json.load(file, object_hook=as_birthday_entry)
 
 
 def save_database(entries: List[BirthdayEntry], db_path: Path) -> None:
     """Serialize BirthdayEntry objects and write them to the JSON file."""
-    dictionaries: tuple[dict[str, Any], ...] = tuple(
-        {
-            "id": entry.id,
-            "full_name": entry.full_name,
-            "month": entry.month,
-            "day": entry.day,
-            "year": entry.year,
-            "notes": entry.notes,
-            "leap_system": entry.leap_system,
-        }
-        for entry in entries
-    )
+    dictionaries = tuple(asdict(entry) for entry in entries)
     with open(db_path, "w", encoding="utf-8") as file:
         json.dump(dictionaries, file, indent=4)
 
