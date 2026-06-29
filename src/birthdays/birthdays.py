@@ -8,10 +8,12 @@ import quopri
 import re
 import uuid
 from dataclasses import asdict, dataclass
+from operator import attrgetter
 from pathlib import Path
 from typing import Any, List, Literal, Optional
 
 from dateutil.relativedelta import relativedelta
+from emojis import date_to_emoji
 from platformdirs import user_data_path
 
 VCARD = re.compile(r"BEGIN:VCARD.*?END:VCARD", flags=re.DOTALL | re.IGNORECASE)
@@ -297,13 +299,98 @@ def merge_entries(
 # ==========================================
 
 
+def to_ordinal(number: int) -> str:
+    """Convert a cardinal number into its ordinal form."""
+    n = abs(number)
+    if n % 100 in (11, 12, 13):
+        return f"{n}th"
+    elif n % 10 == 1:
+        return f"{n}st"
+    elif n % 10 == 2:
+        return f"{n}nd"
+    elif n % 10 == 3:
+        return f"{n}rd"
+    return f"{n}th"
+
+
 def display_birthdays(
     entries: List[BirthdayEntry],
     sort_by: Literal["name", "date", "upcoming", "recent", "age"] = "upcoming",
+    sort_order: Literal["asc", "desc"] = "asc",
     view_style: Literal["simple", "table", "calendar"] = "simple",
 ) -> None:
     """Handle all terminal printing."""
-    ...
+    today = datetime.date.today()
+
+    if sort_by == "name":
+        entries.sort(
+            key=lambda entry: entry.full_name.casefold(), reverse=sort_order == "desc"
+        )
+    elif sort_by == "date":
+        entries.sort(
+            key=lambda entry: (
+                entry.year
+                if entry.year is not None
+                else float("inf" if sort_order == "asc" else "-inf"),
+                entry.month,
+                entry.day,
+            ),
+            reverse=sort_order == "desc",
+        )
+    elif sort_by == "upcoming":
+        entries.sort(
+            key=lambda entry: attrgetter("years", "months", "days")(
+                entry.next_occurrence_in(today)
+            ),
+            reverse=sort_order == "desc",
+        )
+    elif sort_by == "recent":
+        entries.sort(
+            key=lambda entry: attrgetter("years", "months", "days")(
+                entry.prev_occurrence_in(today)
+            ),
+            reverse=sort_order == "desc",
+        )
+    elif sort_by == "age":
+        entries.sort(
+            key=lambda entry: (
+                age
+                if (age := entry.get_age()) is not None
+                else float("inf" if sort_order == "asc" else "-inf")
+            ),
+            reverse=sort_order == "desc",
+        )
+
+    if view_style == "simple":
+        print("Birthdays 🎂")
+        for entry in entries:
+            emoji = date_to_emoji(entry.year, entry.month, entry.day)
+            age = entry.get_age()
+            next_in = entry.next_occurrence_in(today)
+            prev_in = entry.prev_occurrence_in(today)
+
+            print(f"{emoji:<2} {entry}")
+            if entry.is_today():
+                age = f"{to_ordinal(age)} " if age is not None else ""
+                print(f"Has a {age}birthday today 🥳")
+            else:
+                age = f"{age} y.o., " if age is not None else ""
+                months = tuple(
+                    f" {delta.months} month{'s' if delta.months > 1 else ''}"
+                    if delta.months > 0
+                    else ""
+                    for delta in (next_in, prev_in)
+                )
+                days = tuple(
+                    f"{' and' if delta.months else ''} {delta.days} day{'s' if delta.days > 1 else ''}"
+                    if delta.days > 0
+                    else ""
+                    for delta in (next_in, prev_in)
+                )
+                if sort_by != "recent":
+                    print(f"{age}Next in{months[0]}{days[0]}")
+                elif sort_by == "recent":
+                    print(f"{age}Previous in{months[1]}{days[1]}")
 
 
 # ==========================================
@@ -328,6 +415,12 @@ def setup_parser() -> argparse.ArgumentParser:
         choices=["name", "date", "upcoming", "recent", "age"],
         default="upcoming",
         help="How to sort the output",
+    )
+    parser_list.add_argument(
+        "--order",
+        choices=["asc", "desc"],
+        default="asc",
+        help="In which order to sort the output",
     )
     parser_list.add_argument(
         "--view",
