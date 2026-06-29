@@ -1,3 +1,5 @@
+from hashlib import sha256
+
 # fmt: off
 POSITIVE_FACES = (
     # Basic Smiles
@@ -105,3 +107,15 @@ ALL_EMOJIS = (
     + ACTIVITIES
     + TRAVEL_AND_PLACES
 )
+
+
+def date_to_emoji(year: int | None, month: int, day: int) -> str:
+    """Get a unique emoji for the specified date."""
+    if isinstance(year, int):
+        encoded = f"{year}-{month}-{day}".encode("utf-8")
+    else:
+        encoded = f"{month}-{day}".encode("utf-8")
+
+    hashed = sha256(encoded).hexdigest()
+
+    return ALL_EMOJIS[int(hashed, 16) % len(ALL_EMOJIS)]
