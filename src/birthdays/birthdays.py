@@ -302,6 +302,46 @@ def merge_entries(
 # ==========================================
 
 
+def confirm(
+    prompt: str = "Are you sure?",
+    default_no: bool = True,
+    required: bool = False,
+    allow_skip: bool = False,
+) -> bool | None:
+    """Prompt user for a confirmation."""
+
+    if required:
+        suffix = "(y/n/s)" if allow_skip else "(y/n)"
+    else:
+        if allow_skip:
+            suffix = "(y/N/s)" if default_no else "(Y/n/s)"
+        else:
+            suffix = "(y/N)" if default_no else "(Y/n)"
+
+    while True:
+        user_input = input(f"{prompt} {suffix}: ").strip().lower()
+
+        if not user_input:
+            if required:
+                print("Input is required. Please choose an option.")
+                continue
+            return not default_no
+
+        elif user_input in {"yes", "y"}:
+            return True
+
+        elif allow_skip and user_input in {"skip", "s"}:
+            return None
+
+        elif user_input in {"no", "n"}:
+            return False
+
+        if required:
+            print("Invalid input. Please choose a valid option.")
+            continue
+
+        return False
+
 def to_ordinal(number: int) -> str:
     """Convert a cardinal number into its ordinal form."""
     n = abs(number)
