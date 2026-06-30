@@ -212,6 +212,27 @@ def save_database(entries: List[BirthdayEntry], db_path: Path) -> None:
 # ==========================================
 
 
+def decode_vcard_text(raw_text: str, parameters: str | None) -> str:
+    """Safely decode Quoted-Printable or Base64 vCard strings."""
+    if not parameters:
+        return raw_text.strip()
+
+    parameters = parameters.upper()
+    if "ENCODING=QUOTED-PRINTABLE" in parameters:
+        unquoted = quopri.decodestring(raw_text)
+        if "CHARSET=UTF-8" in parameters:
+            return unquoted.decode("utf-8", errors="replace").strip()
+        return unquoted.decode("latin1", errors="replace").strip()
+
+    elif "ENCODING=B" in parameters:
+        unbased = base64.standard_b64decode(raw_text)
+        if "CHARSET=UTF-8" in parameters:
+            return unbased.decode("utf-8", errors="replace").strip()
+        return unbased.decode("latin1", errors="replace").strip()
+
+    return raw_text.strip()
+
+
 def leapling_safe_date(
     year: int, month: int, day: int, leap_system: Literal["after", "before"] = "before"
 ) -> datetime.date:
