@@ -765,8 +765,28 @@ def main():
     parser = setup_parser()
     args = parser.parse_args()
 
+    db_path = get_database_path()
+
     if args.command == "list":
-        ...  # load_db(), sort, display_birthdays()
+        if args.file:
+            if not args.file.exists():
+                print(f"Error: File '{args.file}' not found.")
+                sys.exit(1)
+            if args.file.suffix.lower() in [".vcf", ".vcard"]:
+                entries = parse_vcards(args.file, args.leap_system)
+            else:
+                entries = load_database(args.file)
+        else:
+            entries = load_database(db_path)
+
+        if not entries:
+            print("No birthdays found.")
+            return
+
+        display_birthdays(
+            entries, sort_by=args.sort, sort_order=args.order, view_style=args.view
+        )
+
     elif args.command == "add":
         ...  # create entry, load_db(), append, save_db()
     elif args.command == "edit":
