@@ -342,6 +342,68 @@ def confirm(
 
         return False
 
+
+@overload
+def choose(
+    options: Collection[Any],
+    extra: dict[str, str] | None = None,
+    prompt: str = "Choose an option:",
+    start: int = 1,
+    required: Literal[True] = True,
+) -> str: ...
+
+
+@overload
+def choose(
+    options: Collection[Any],
+    extra: dict[str, str] | None = None,
+    prompt: str = "Choose an option:",
+    start: int = 1,
+    required: Literal[False] = ...,
+) -> str | None: ...
+
+
+def choose(
+    options: Collection[Any],
+    extra: dict[str, str] | None = None,
+    prompt: str = "Choose an option:",
+    start: int = 1,
+    required: bool = False,
+) -> str | None:
+    """Prompt user to make a choice."""
+    print(prompt)
+    for position, option in enumerate(options, start):
+        print(f"[{position}] - {option}")
+
+    if extra:
+        for key, value in extra.items():
+            print(f"[{key}] - {value}")
+
+    while True:
+        choice = input("-> My choice is... ").strip()
+
+        if not choice:
+            if required:
+                print("Input is required. Please choose a valid option.")
+                continue
+            return None
+
+        if choice.isdecimal():
+            if start <= int(choice) < start + len(options):
+                return choice
+
+        if extra:
+            choice_lower = choice.lower()
+            for key in extra:
+                if key.lower() == choice_lower:
+                    return key
+
+        if required:
+            print("Invalid choice. Please try again.")
+        else:
+            return None
+
+
 def to_ordinal(number: int) -> str:
     """Convert a cardinal number into its ordinal form."""
     n = abs(number)
