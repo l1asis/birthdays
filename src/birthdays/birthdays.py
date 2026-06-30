@@ -344,7 +344,88 @@ def merge_entries(
     interactive: bool = True,
 ) -> List[BirthdayEntry]:
     """Merge two lists using fuzzy string matching to detect similar names."""
-    ...
+
+    existing_map: dict[str, list[BirthdayEntry]] = defaultdict(list)
+    for entry in existing:
+        existing_map[entry.full_name].append(entry)
+
+    existing_names = tuple(existing_map.keys())
+
+    final_db = {entry.id: entry for entry in existing}
+
+    for new_entry in incoming:
+        if new_entry.full_name in existing_map:
+            if len(existing_map[new_entry.full_name]) > 1:
+                choice = choose(
+                    existing_map[new_entry.full_name],
+                    prompt=f"\nMultiple exact matches for '{new_entry.full_name}'. Which one to merge into?",
+                    extra={"S": "Skip this contact entirely"},
+                    required=True,
+                )
+
+                if choice == "S":
+                    continue
+
+                match = existing_map[new_entry.full_name][int(choice) - 1]
+            else:
+                match = existing_map[new_entry.full_name][0]
+
+            if (
+                match.month == new_entry.month
+                and match.day == new_entry.day
+                and match.year == new_entry.year
+                and match.notes == new_entry.notes
+            ):
+                continue
+
+            if interactive:
+                print(
+                    f"\nExact name match found for '{new_entry.full_name}', but data differs."
+                )
+                print(f"Existing: {match}")
+                print(f"Incoming: {new_entry}")
+                if confirm("Update existing entry?"):
+                    final_db[match.id] = merge_pair(match, new_entry)
+            else:
+                final_db[match.id] = merge_pair(match, new_entry, interactive=False)
+
+        else:
+            close_names = difflib.get_close_matches(
+                new_entry.full_name, existing_names, n=3, cutoff=0.8
+            )
+
+            if not close_names:
+                final_db[new_entry.id] = new_entry
+                continue
+
+            if interactive:
+                print(f"\nIncoming contact: {new_entry}")
+                print("Found similar existing names:")
+
+                options: List[BirthdayEntry] = [
+                    entry for name in close_names for entry in existing_map[name]
+                ]
+
+                choice = choose(
+                    options,
+                    extra={
+                        "A": "Add as completely new entry",
+                        "S": "Skip this contact entirely",
+                    },
+                    required=True,
+                )
+
+                if choice == "A":
+                    final_db[new_entry.id] = new_entry
+                elif choice == "S":
+                    pass
+                elif choice.isdigit():
+                    selected_match = options[int(choice) - 1]
+                    final_db[selected_match.id] = merge_pair(selected_match, new_entry)
+            else:
+                final_db[new_entry.id] = new_entry
+
+    return list(final_db.values())
 
 
 # ==========================================
