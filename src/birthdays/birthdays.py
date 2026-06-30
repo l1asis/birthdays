@@ -676,6 +676,12 @@ def setup_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Read directly from a .vcf or .json file without modifying the database",
     )
+    parser_list.add_argument(
+        "--leap-system",
+        choices=["before", "after"],
+        default="before",
+        help="Fallback leap system when reading dynamically from a .vcf file",
+    )
 
     parser_add = subparsers.add_parser("add", help="Manually add a new birthday")
     parser_add.add_argument("name", type=str, help="Full name of the person")
@@ -683,6 +689,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser_add.add_argument("--note", type=str, help="Optional note to attach")
     parser_add.add_argument(
         "--leap-system",
+        dest="leap_system",
         choices=["before", "after"],
         default="before",
         help="When leaplings celebrate in non-leap years (default: before)",
@@ -697,6 +704,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser_edit.add_argument("--note", type=str, help="Update the attached note")
     parser_edit.add_argument(
         "--leap-system",
+        dest="leap_system",
         choices=["before", "after"],
         help="Update when this leapling celebrates in non-leap years",
     )
@@ -721,6 +729,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     parser_import.add_argument(
         "--leap-system",
+        dest="leap_system",
         choices=["before", "after"],
         default="before",
         help="Default leap system to assign to imported contacts",
