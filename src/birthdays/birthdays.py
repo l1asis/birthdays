@@ -256,29 +256,23 @@ def day_might_exist(year: int | None, month: int, day: int) -> bool:
 def parse_vcards(
     vcf_file: Path, leap_system: Literal["after", "before"]
 ) -> List[BirthdayEntry]:
-    """Extract names and birthdays from all vCard formats."""
+    """Extract names, birthdays, and notes from all vCard formats."""
     with open(vcf_file, "r", encoding="utf-8") as file:
-        vcards: list[str] = VCARD.findall(file.read())
+        raw_text = file.read()
 
+    unfolded_text = UNFOLD.sub("", raw_text)
+    unfolded_text = UNFOLD_SOFT.sub("", raw_text)
+
+    vcards: list[str] = VCARD.findall(unfolded_text)
     birthdays: List[BirthdayEntry] = []
 
     for vcard in vcards:
         fn_match = FULL_NAME.search(vcard)
         bday_match = BIRTHDAY.search(vcard)
+        note_match = NOTE.search(vcard)
 
         if fn_match is not None:
-            parameters = fn_match.group(1)
-            full_name = fn_match.group(2)
-
-            if parameters:
-                if "ENCODING=QUOTED-PRINTABLE" in parameters:
-                    unquoted = quopri.decodestring(full_name)
-                    if "CHARSET=UTF-8" in parameters:
-                        full_name = unquoted.decode("utf-8")
-                elif "ENCODING=b" in parameters:
-                    unbased = base64.standard_b64decode(full_name)
-                    if "CHARSET=UTF-8" in parameters:
-                        full_name = unbased.decode("utf-8")
+            full_name = decode_vcard_text(fn_match.group(2), fn_match.group(1))
 
             if bday_match is not None:
                 date_str = bday_match.group(1)
@@ -301,6 +295,13 @@ def parse_vcards(
                         )
 
                 if month is not None and day is not None:
+                    notes = None
+                    if note_match is not None:
+                        raw_note = decode_vcard_text(
+                            note_match.group(2), note_match.group(1)
+                        )
+                        notes = raw_note.replace(r"\n", " ").replace(r"\,", ",")
+
                     birthdays.append(
                         BirthdayEntry(
                             uuid.uuid4().hex,
@@ -308,6 +309,7 @@ def parse_vcards(
                             month,
                             day,
                             year,
+                            notes,
                             leap_system,
                         )
                     )
