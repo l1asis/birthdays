@@ -288,6 +288,56 @@ def parse_vcards(
     return birthdays
 
 
+def merge_pair(
+    existing: BirthdayEntry, incoming: BirthdayEntry, interactive: bool = True
+) -> BirthdayEntry:
+    """Combine data of two entries meaningfully."""
+
+    merged_notes = tuple(n for n in (existing.notes, incoming.notes) if n)
+    merged_notes = "; ".join(merged_notes) if merged_notes else None
+
+    if interactive:
+        notes_choice = choose(("Existing", "Incoming", "Merge"))
+        if notes_choice == "1":
+            final_notes = existing.notes
+        elif notes_choice == "2":
+            final_notes = incoming.notes
+        else:
+            final_notes = merged_notes
+
+        return BirthdayEntry(
+            existing.id,
+            incoming.full_name
+            if existing.full_name != incoming.full_name
+            and confirm(f"Change the full name?")
+            else existing.full_name,
+            incoming.month
+            if existing.month != incoming.month and confirm(f"Change the month?")
+            else existing.month,
+            incoming.day
+            if existing.day != incoming.day and confirm(f"Change the day?")
+            else existing.day,
+            incoming.year
+            if existing.year is None
+            or (existing.year != incoming.year and confirm(f"Change the year?"))
+            else existing.year,
+            final_notes,
+            incoming.leap_system
+            if existing.leap_system != incoming.leap_system
+            and confirm(f"Change the leap system?")
+            else existing.leap_system,
+        )
+    return BirthdayEntry(
+        existing.id,
+        incoming.full_name,
+        incoming.month,
+        incoming.day,
+        incoming.year if existing.year is None else existing.year,
+        merged_notes,
+        incoming.leap_system,
+    )
+
+
 def merge_entries(
     existing: List[BirthdayEntry],
     incoming: List[BirthdayEntry],
