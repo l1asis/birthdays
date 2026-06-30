@@ -272,7 +272,9 @@ def parse_vcards(
 
                     if date_match is not None:
                         year, month, day = (
-                            int(date_match.group(1)),
+                            int(year_match)
+                            if (year_match := date_match.group(1)).isdecimal()
+                            else None,
                             int(date_match.group(2)),
                             int(date_match.group(3)),
                         )
