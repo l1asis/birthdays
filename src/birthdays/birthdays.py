@@ -458,6 +458,68 @@ def merge_entries(
     return list(final_db.values())
 
 
+def find_entry(db: List[BirthdayEntry], identifier: str) -> BirthdayEntry | None:
+    """Locate an entry by UUID, name, date, or fuzzy match."""
+
+    for entry in db:
+        if entry.id == identifier:
+            return entry
+
+    matches: list[BirthdayEntry] = []
+    ident_lower = identifier.casefold()
+
+    date_match = DATE.match(identifier)
+    year = month = day = None
+    if date_match:
+        year_group = date_match.group(1)
+        year = int(year_group) if year_group and year_group != "--" else None
+        month = int(date_match.group(2))
+        day = int(date_match.group(3))
+
+    for entry in db:
+        if entry.full_name.casefold() == ident_lower:
+            matches.append(entry)
+        elif (
+            date_match
+            and entry.month == month
+            and entry.day == day
+            and (not year or entry.year == year)
+        ):
+            matches.append(entry)
+        elif ident_lower in entry.full_name.casefold():
+            matches.append(entry)
+        elif entry.notes and ident_lower in entry.notes.casefold():
+            matches.append(entry)
+
+    if not matches:
+        db_names = [e.full_name for e in db]
+        close_names = difflib.get_close_matches(identifier, db_names, n=5, cutoff=0.6)
+
+        if close_names:
+            close_names_set = set(close_names)
+            for entry in db:
+                if entry.full_name in close_names_set:
+                    matches.append(entry)
+
+    if not matches:
+        print(f"Error: No entry found matching '{identifier}'.")
+        return None
+
+    if len(matches) == 1:
+        return matches[0]
+
+    choice = choose(
+        matches,
+        prompt=f"\nMultiple entries found for '{identifier}'. Which one did you mean?",
+        extra={"S": "Skip/Cancel"},
+        required=True,
+    )
+    if choice == "S":
+        return None
+
+    return matches[int(choice) - 1]
+
+
 # ==========================================
 #             PRESENTATION APIs
 # ==========================================
