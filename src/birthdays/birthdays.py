@@ -166,16 +166,17 @@ class BirthdayEntry:
 def get_database_path() -> Path:
     """Resolve OS-specific config path."""
     if custom_path := os.getenv("BIRTHDAYS_HOME"):
-        path = Path(custom_path)
-        path.mkdir(parents=True, exist_ok=True)
-        return path
+        dir_path = Path(custom_path)
+    else:
+        dir_path = user_data_path(
+            "birthdays",
+            "l1asis",
+            ensure_exists=True,
+        )
 
-    # TODO: Replace with __init__.py variable:
-    return user_data_path(
-        "birthdays",
-        "Volodymyr Horshenin (@l1asis)",
-        ensure_exists=True,
-    )
+    dir_path.mkdir(parents=True, exist_ok=True)
+
+    return dir_path / "birthdays.json"
 
 
 def as_birthday_entry(dictionary: dict[str, Any]) -> BirthdayEntry:
