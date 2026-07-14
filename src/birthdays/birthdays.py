@@ -339,22 +339,22 @@ def merge_pair(
             existing.id,
             incoming.full_name
             if existing.full_name != incoming.full_name
-            and confirm(f"Change the full name?")
+            and confirm("Change the full name?")
             else existing.full_name,
             incoming.month
-            if existing.month != incoming.month and confirm(f"Change the month?")
+            if existing.month != incoming.month and confirm("Change the month?")
             else existing.month,
             incoming.day
-            if existing.day != incoming.day and confirm(f"Change the day?")
+            if existing.day != incoming.day and confirm("Change the day?")
             else existing.day,
             incoming.year
             if existing.year is None
-            or (existing.year != incoming.year and confirm(f"Change the year?"))
+            or (existing.year != incoming.year and confirm("Change the year?"))
             else existing.year,
             final_notes,
             incoming.leap_system
             if existing.leap_system != incoming.leap_system
-            and confirm(f"Change the leap system?")
+            and confirm("Change the leap system?")
             else existing.leap_system,
         )
     return BirthdayEntry(
