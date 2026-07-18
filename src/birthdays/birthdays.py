@@ -911,7 +911,20 @@ def main():
         print(f"Updated: {target}")
 
     elif args.command == "delete":
-        ...  # load_db(), remove entry, save_db()
+        db = load_database(db_path)
+        target = find_entry(db, args.identifier)
+        if not target:
+            sys.exit(1)
+
+        if not args.yes:
+            if not confirm(f"Are you sure you want to delete {target}?"):
+                print("Deletion cancelled.")
+                return
+
+        db = [e for e in db if e.id != target.id]
+        save_database(db, db_path)
+        print(f"Deleted '{target.full_name}'.")
+
     elif args.command == "import":
         ...  # parse_vcards(), load_db(), merge_entries(), save_db()
 
