@@ -926,7 +926,23 @@ def main():
         print(f"Deleted '{target.full_name}'.")
 
     elif args.command == "import":
-        ...  # parse_vcards(), load_db(), merge_entries(), save_db()
+        if not args.file.exists():
+            print(f"Error: File '{args.file}' not found.")
+            sys.exit(1)
+
+        db = load_database(db_path)
+        incoming = parse_vcards(args.file, args.leap_system)
+
+        for entry in incoming:
+            entry.leap_system = args.leap_system
+
+        print(f"Loaded {len(incoming)} contacts from {args.file.name}.")
+
+        merged_db = merge_entries(db, incoming, interactive=not args.yes)
+        save_database(merged_db, db_path)
+
+        added_count = len(merged_db) - len(db)
+        print(f"\nImport complete. The database grew by {added_count} entries.")
 
 
 if __name__ == "__main__":
