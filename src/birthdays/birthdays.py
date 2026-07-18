@@ -882,7 +882,34 @@ def main():
         print(f"Added: {new_entry}")
 
     elif args.command == "edit":
-        ...
+        db = load_database(db_path)
+        target = find_entry(db, args.identifier)
+        if not target:
+            sys.exit(1)
+
+        if args.name:
+            target.full_name = args.name
+
+        if args.date:
+            date_match = DATE.match(args.date)
+            if not date_match:
+                print("Error: Invalid date format. Use YYYY-MM-DD or MM-DD.")
+                sys.exit(1)
+
+            year_group = date_match.group(1)
+            target.year = int(year_group) if year_group and year_group != "--" else None
+            target.month = int(date_match.group(2))
+            target.day = int(date_match.group(3))
+
+        if args.note is not None:
+            target.notes = args.note if args.note.strip() else None
+
+        if args.leap_system:
+            target.leap_system = args.leap_system
+
+        save_database(db, db_path)
+        print(f"Updated: {target}")
+
     elif args.command == "delete":
         ...  # load_db(), remove entry, save_db()
     elif args.command == "import":
