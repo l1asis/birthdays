@@ -851,7 +851,36 @@ def main():
         )
 
     elif args.command == "add":
-        ...  # create entry, load_db(), append, save_db()
+        db = load_database(db_path)
+
+        date_match = DATE.match(args.date)
+        if not date_match:
+            print("Error: Invalid date format. Use YYYY-MM-DD or MM-DD.")
+            sys.exit(1)
+
+        year_group = date_match.group(1)
+        year = int(year_group) if year_group and year_group != "--" else None
+        month = int(date_match.group(2))
+        day = int(date_match.group(3))
+
+        try:
+            new_entry = BirthdayEntry(
+                id=uuid.uuid4().hex,
+                full_name=args.name,
+                month=month,
+                day=day,
+                year=year,
+                notes=args.note,
+                leap_system=args.leap_system,
+            )
+        except ValueError as e:
+            print(f"Error creating entry: {e}")
+            sys.exit(1)
+
+        db.append(new_entry)
+        save_database(db, db_path)
+        print(f"Added: {new_entry}")
+
     elif args.command == "edit":
         ...
     elif args.command == "delete":
