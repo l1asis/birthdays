@@ -1,0 +1,56 @@
+BEGIN:VCARD
+VERSION:3.0
+FN:Amélie Laurent
+BDAY:1990-05-14
+NOTE:Met at the UX conference in Paris. Always brings great coffee.
+END:VCARD
+
+BEGIN:VCARD
+VERSION:3.0
+FN:Hiroshi Tanaka
+BDAY:1992-02-29
+NOTE:University roommate. Leapling! 🐸
+END:VCARD
+
+BEGIN:VCARD
+VERSION:3.0
+FN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:=D0=94=D1=96=D0=B4=D1=83=D1=81=D1=8C =D0=86=D0=B2=D0=B0=D0=BD
+BDAY:1955-01-07
+NOTE;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:The absolute best grandfather.=20=
+Always tells the greatest stories about his youth.
+END:VCARD
+
+BEGIN:VCARD
+VERSION:3.0
+FN:María José García
+BDAY:--10-31
+NOTE:Halloween birthday party organizer.
+END:VCARD
+
+BEGIN:VCARD
+VERSION:3.0
+FN:Fatima Al-Sayed
+BDAY:1988-08-12
+NOTE:Project manager for the backend migration.
+  Needs to be reminded about the server timezone changes.
+END:VCARD
+
+BEGIN:VCARD
+VERSION:3.0
+FN:Kwame Osei
+BDAY:--03-15
+NOTE:Gym buddy.
+END:VCARD
+
+BEGIN:VCARD
+VERSION:3.0
+FN:Mateusz Kowalski
+BDAY:1995-11-11
+NOTE:Brings the best pierogi to the office potlucks.
+END:VCARD
+
+BEGIN:VCARD
+VERSION:3.0
+FN:Priya Sharma
+BDAY:1999-07-21
+END:VCARD
