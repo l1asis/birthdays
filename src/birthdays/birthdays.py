@@ -827,7 +827,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
 
     parser_import = subparsers.add_parser(
-        "import", help="Import birthdays from a vCard file"
+        "import", help="Import birthdays from a vCard or JSON file"
     )
     parser_import.add_argument("file", type=Path, help="Path to the .vcf file")
     parser_import.add_argument(
@@ -958,7 +958,11 @@ def main():
             sys.exit(1)
 
         db = load_database(db_path)
-        incoming = parse_vcards(args.file, args.leap_system)
+
+        if args.file.suffix.lower() in [".vcf", ".vcard"]:
+            incoming = parse_vcards(args.file, args.leap_system)
+        else:
+            incoming = load_database(args.file)
 
         print(f"Loaded {len(incoming)} contacts from {args.file.name}.")
 
