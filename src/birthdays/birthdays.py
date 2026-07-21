@@ -17,8 +17,10 @@ from pathlib import Path
 from typing import Any, List, Literal, Optional, overload
 
 from dateutil.relativedelta import relativedelta
-from emojis import date_to_emoji
 from platformdirs import user_data_path
+
+from . import __about__, __version__
+from .emojis import date_to_emoji
 
 VCARD = re.compile(r"BEGIN:VCARD.*?END:VCARD", flags=re.DOTALL | re.IGNORECASE)
 FULL_NAME = re.compile(r"^FN(;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE)
