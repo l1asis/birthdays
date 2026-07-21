@@ -28,5 +28,5 @@ __about__ = rf"""
   from JSON- or vCard-based contacts.
 
   Usage:
-  Run `python -m birthdays-cli --help` to see available commands.
+  Run `python -m birthdays --help` to see available commands.
 """
