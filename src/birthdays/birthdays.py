@@ -390,7 +390,10 @@ def merge_entries(
             if len(existing_map[new_entry.full_name]) > 1:
                 choice = choose(
                     existing_map[new_entry.full_name],
-                    prompt=f"\nMultiple exact matches for '{new_entry.full_name}'. Which one to merge into?",
+                    prompt=(
+                        f"\nMultiple exact matches for '{new_entry.full_name}'. "
+                        "Which one to merge into?"
+                    ),
                     extra={"S": "Skip this contact entirely"},
                     required=True,
                 )
@@ -412,7 +415,10 @@ def merge_entries(
 
             if interactive:
                 print(
-                    f"\nExact name match found for '{new_entry.full_name}', but data differs."
+                    (
+                        f"\nExact name match found for '{new_entry.full_name}', "
+                        "but data differs."
+                    )
                 )
                 print(f"Existing: {match}")
                 print(f"Incoming: {new_entry}")
@@ -712,7 +718,10 @@ def display_birthdays(
                     for delta in (next_in, prev_in)
                 )
                 days = tuple(
-                    f"{' and' if delta.months else ''} {delta.days} day{'s' if delta.days > 1 else ''}"
+                    (
+                        f"{' and' if delta.months else ''} "
+                        f"{delta.days} day{'s' if delta.days > 1 else ''}"
+                    )
                     if delta.days > 0
                     else ""
                     for delta in (next_in, prev_in)
