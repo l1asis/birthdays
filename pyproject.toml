@@ -18,7 +18,8 @@ readme = "README.md"
 license = "MIT"
 license-files = ["LICEN[CS]E*"]
 keywords = [
-    "cli", "utility", "tool",
+    "cli", "command-line", "birthdays", "birthday-tracker",
+    "contacts", "vcard", "vcf", "calendar", "address-book"
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
