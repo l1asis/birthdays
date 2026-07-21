@@ -98,7 +98,7 @@ class BirthdayEntry:
 
     def prev_occurrence_in(self, from_date: datetime.date) -> relativedelta:
         """Calculate the exact distance to the previous birthday."""
-        return relativedelta(self.get_prev_occurrence(from_date), from_date)
+        return relativedelta(from_date, self.get_prev_occurrence(from_date))
 
     def __post_init__(self):
         if not day_might_exist(self.year, self.month, self.day):
@@ -729,7 +729,7 @@ def display_birthdays(
                 if sort_by != "recent":
                     print(f"{age}Next in{months[0]}{days[0]}")
                 elif sort_by == "recent":
-                    print(f"{age}Previous in{months[1]}{days[1]}")
+                    print(f"{age}Previous:{months[1]}{days[1]} ago")
 
 
 # ==========================================
