@@ -933,9 +933,6 @@ def main():
         db = load_database(db_path)
         incoming = parse_vcards(args.file, args.leap_system)
 
-        for entry in incoming:
-            entry.leap_system = args.leap_system
-
         print(f"Loaded {len(incoming)} contacts from {args.file.name}.")
 
         merged_db = merge_entries(db, incoming, interactive=not args.yes)
