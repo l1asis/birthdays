@@ -943,6 +943,8 @@ def main():
         added_count = len(merged_db) - len(db)
         print(f"\nImport complete. The database grew by {added_count} entries.")
 
+    sys.exit(0)
+
 
 if __name__ == "__main__":
     main()
