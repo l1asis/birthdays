@@ -745,6 +745,18 @@ def setup_parser() -> argparse.ArgumentParser:
         description="A robust CLI tool to manage, merge, and track birthdays.",
     )
 
+    parser.add_argument(
+        "--version",
+        action="version",
+        help="Show program's version number and exit",
+        version=f"%(prog)s {__version__}",
+    )
+    parser.add_argument(
+        "--about",
+        action="store_true",
+        help="Show information about this program",
+    )
+
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
     subparsers.required = True
 
@@ -836,6 +848,10 @@ def setup_parser() -> argparse.ArgumentParser:
 
 
 def main():
+    if "--about" in sys.argv:
+        print(__about__)
+        sys.exit(0)
+
     parser = setup_parser()
     args = parser.parse_args()
 
