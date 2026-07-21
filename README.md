@@ -1,6 +1,6 @@
 # birthdays
 
-![birthdays GIF demo](https://raw.githubusercontent.com/l1asis/birthdays/refs/heads/main/images/demo.gif)
+![birthdays GIF demo](https://raw.githubusercontent.com/l1asis/birthdays/refs/heads/main/examples/demo.gif)
 
 [![PyPI Version](https://img.shields.io/pypi/v/birthdays-cli.svg)](https://pypi.org/project/birthdays-cli/)
 [![PyPI Python version](https://img.shields.io/pypi/pyversions/birthdays-cli.svg)](https://pypi.org/project/birthdays-cli/)
