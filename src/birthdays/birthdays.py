@@ -652,7 +652,7 @@ def to_ordinal(number: int) -> str:
 def display_birthdays(
     entries: List[BirthdayEntry],
     sort_by: Literal["name", "date", "upcoming", "recent", "age"] = "upcoming",
-    sort_order: Literal["asc", "desc"] = "asc",
+    sort_order: Literal["asc", "desc"] = "desc",
     view_style: Literal["simple", "table", "calendar"] = "simple",
 ) -> None:
     """Handle all terminal printing."""
@@ -770,7 +770,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser_list.add_argument(
         "--order",
         choices=["asc", "desc"],
-        default="asc",
+        default="desc",
         help="In which order to sort the output",
     )
     parser_list.add_argument(
