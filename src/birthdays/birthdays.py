@@ -72,7 +72,7 @@ class BirthdayEntry:
             from_date.year, self.month, self.day, self.leap_system
         )
         if from_date.month < this_year.month or (
-            from_date.month == this_year.month and from_date.day < this_year.day
+            from_date.month == this_year.month and from_date.day <= this_year.day
         ):
             return this_year
         return leapling_safe_date(
