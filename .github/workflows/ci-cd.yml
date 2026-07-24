@@ -1,0 +1,141 @@
+name: CI/CD Pipeline 🚀
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint & Format 🧹
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        persist-credentials: false
+  
+    - name: Set up Python ⚙️
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.x"
+
+    - name: Install Ruff 🦀
+      run: python -m pip install ruff
+
+    - name: Lint and Format 🫧
+      run: |
+        ruff check . --output-format=github
+        ruff format --check .
+
+  commitlint:
+    name: Lint Commit Messages 💬
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository 📥
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 💛
+        if: github.event_name == 'pull_request'
+        uses: actions/setup-node@v6
+        with:
+          node-version: "lts/*"
+
+      - name: Install commitlint 📦
+        if: github.event_name == 'pull_request'
+        run: npm install -D @commitlint/cli @commitlint/config-conventional
+
+      - name: Validate PR commits with commitlint 🔍
+        if: github.event_name == 'pull_request'
+        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+
+  release:
+    name: Run Semantic Release 🌸
+    needs: [lint, commitlint]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    outputs:
+      published: ${{ steps.semantic.outputs.published }}
+
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+        persist-credentials: false
+
+    - name: Setup Node.js 💛
+      uses: actions/setup-node@v6
+      with:
+        node-version: "lts/*"
+
+    - name: Set up Python ⚙️
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.x"
+
+    - name: Install build tools 📦
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install build
+
+    - name: Install Semantic Release plugins 📦
+      run: npm install -D semantic-release @semantic-release/changelog @semantic-release/exec @semantic-release/git
+
+    - name: Semantic Release 🌸
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: npx semantic-release
+
+    - name: Check if release was published 🤔
+      id: semantic
+      run: |
+        if [ "$RELEASE_CREATED" = "true" ]; then
+          echo "published=true" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Store final distribution packages 📥
+      if: steps.semantic.outputs.published == 'true'
+      uses: actions/upload-artifact@v7
+      with:
+        name: release-dists
+        path: dist/
+
+  publish-to-pypi:
+    name: Publish Python 🐍 distribution 📦 to PyPI
+    needs: release
+    if: needs.release.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/birthdays-cli
+    permissions:
+      id-token: write
+
+    steps:
+    - name: Download release dists 📥
+      uses: actions/download-artifact@v8
+      with:
+        name: release-dists
+        path: dist/
+
+    - name: Publish distribution 📦 to PyPI 🚀
+      uses: pypa/gh-action-pypi-publish@release/v1
