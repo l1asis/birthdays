@@ -654,6 +654,7 @@ def display_birthdays(
     sort_by: Literal["name", "date", "upcoming", "recent", "age"] = "upcoming",
     sort_order: Literal["asc", "desc"] = "desc",
     view_style: Literal["simple", "table", "calendar"] = "simple",
+    no_emoji: bool = False,
 ) -> None:
     """Handle all terminal printing."""
     today = datetime.date.today()
@@ -698,17 +699,21 @@ def display_birthdays(
         )
 
     if view_style == "simple":
-        print("Birthdays 🎂")
+        print(f"Birthdays{' 🎂' if not no_emoji else ''}")
         for entry in entries:
-            emoji = date_to_emoji(entry.year, entry.month, entry.day)
             age = entry.get_age()
             next_in = entry.next_occurrence_in(today)
             prev_in = entry.prev_occurrence_in(today)
 
-            print(f"{emoji:<2} {entry}")
+            if no_emoji:
+                print(entry)
+            else:
+                emoji = date_to_emoji(entry.year, entry.month, entry.day)
+                print(f"{emoji:<2} {entry}")
+
             if entry.is_today():
                 age = f"{to_ordinal(age)} " if age is not None else ""
-                print(f"Has a {age}birthday today 🥳")
+                print(f"Has a {age}birthday today{' 🥳' if not no_emoji else '!'}")
             else:
                 age = f"{age} y.o., " if age is not None else ""
                 months = tuple(
@@ -790,6 +795,11 @@ def setup_parser() -> argparse.ArgumentParser:
         choices=["before", "after"],
         default="before",
         help="Fallback leap system when reading dynamically from a .vcf file",
+    )
+    parser_list.add_argument(
+        "--no-emoji",
+        action="store_true",
+        help="Disable the use of emojis",
     )
 
     parser_add = subparsers.add_parser("add", help="Manually add a new birthday")
@@ -874,7 +884,11 @@ def main():
             return
 
         display_birthdays(
-            entries, sort_by=args.sort, sort_order=args.order, view_style=args.view
+            entries,
+            sort_by=args.sort,
+            sort_order=args.order,
+            view_style=args.view,
+            no_emoji=args.no_emoji,
         )
 
     elif args.command == "add":
