@@ -17,7 +17,7 @@
 - **Smart Imports:** Import contacts directly from `.vcf` vCard files or JSON databases
 - **Interactive Merging:** During imports, the CLI intelligently detects duplicates or data collisions and prompts you to safely merge them
 - **Leapling Support:** Configure how leap year birthdays (February 29th) are handled in non-leap years, choosing to celebrate either the day before or the day after
-- **Festive UI:** Every date is assigned a unique, deterministic emoji to keep the terminal vibe bright and colorful
+- **Festive UI:** Every date is assigned a unique, deterministic emoji to keep the terminal vibe bright and colorful *(includes a `--no-emoji` flag)*
 
 ## Requirements
 
