@@ -755,6 +755,59 @@ def display_birthdays(
                     print(f"    {age}Previous:{months[1]}{days[1]} ago")
 
 
+def display_motd(
+    entries: List[BirthdayEntry],
+    horizon_days: int = 7,
+    limit: int = 3,
+    quiet_if_empty: bool = False,
+    use_emoji: bool = True,
+    show_header_date: bool = False,
+) -> None:
+    """Print a minimal summary of upcoming birthdays."""
+    today = datetime.date.today()
+
+    upcoming = [
+        entry
+        for entry in entries
+        if (entry.get_next_occurrence(today) - today).days <= horizon_days
+    ]
+
+    if not upcoming and not quiet_if_empty:
+        print(
+            f"No upcoming birthdays for the next {horizon_days} "
+            f"day{'s' if horizon_days != 1 else ''}!"
+        )
+        print("Run 'birthdays list' to see all.")
+        return
+    elif not upcoming and quiet_if_empty:
+        return
+
+    upcoming = sort_entries(upcoming, sort_by="upcoming", sort_order="asc")
+    printable = upcoming[:limit]
+    truncated = upcoming[limit:]
+
+    more_today_count = sum(1 for e in truncated if e.is_today())
+    more_upcoming_count = len(truncated) - more_today_count
+
+    display_birthdays(
+        printable,
+        view_style="simple",
+        use_emoji=use_emoji,
+        should_sort=False,
+        show_header_date=show_header_date,
+    )
+
+    if more_today_count > 0:
+        print(f"...and {more_today_count} more today!")
+
+    if more_upcoming_count > 0:
+        timeframe = (
+            "this week" if horizon_days == 7 else f"in the next {horizon_days} days"
+        )
+        print(f"...and {more_upcoming_count} more upcoming {timeframe}.")
+        print("Run 'birthdays list' to see all.")
+
+
 # ==========================================
 #               ARGPARSE CLI
 # ==========================================
@@ -817,6 +870,16 @@ def setup_parser() -> argparse.ArgumentParser:
         choices=["before", "after"],
         default="before",
         help="Fallback leap system when reading dynamically from a .vcf file",
+    )
+
+    parser_motd = subparsers.add_parser("motd", help="Print a minimal MOTD summary")
+    parser_motd.add_argument("--days", type=int, default=7, help="Days to look ahead")
+    parser_motd.add_argument("--limit", type=int, default=3, help="Max entries to show")
+    parser_motd.add_argument(
+        "--quiet-if-empty", action="store_true", help="Exit silently if no birthdays"
+    )
+    parser_motd.add_argument(
+        "--show-date", action="store_true", help="Include today's date in the header"
     )
 
     parser_add = subparsers.add_parser("add", help="Manually add a new birthday")
@@ -912,6 +975,17 @@ def main():
             sort_order=args.order,
             view_style=args.view,
             use_emoji=use_emoji,
+        )
+
+    elif args.command == "motd":
+        entries = load_database(db_path)
+        display_motd(
+            entries,
+            horizon_days=args.days,
+            limit=args.limit,
+            quiet_if_empty=args.quiet_if_empty,
+            use_emoji=use_emoji,
+            show_header_date=args.show_date,
         )
 
     elif args.command == "add":
