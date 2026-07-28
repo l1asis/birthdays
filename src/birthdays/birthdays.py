@@ -706,6 +706,7 @@ def display_birthdays(
     view_style: Literal["simple", "table", "calendar"] = "simple",
     use_emoji: bool = True,
     should_sort: bool = True,
+    show_header_date: bool = False,
 ) -> None:
     """Handle all terminal printing."""
     today = datetime.date.today()
@@ -714,7 +715,12 @@ def display_birthdays(
         entries = sort_entries(entries, sort_by, sort_order)
 
     if view_style == "simple":
-        print(f"Birthdays{' 🎂' if use_emoji else ''}")
+        if show_header_date:
+            date_str = today.strftime("%A, %b %d")
+            print(f"Birthdays for {date_str}{' 🎂' if use_emoji else ''}")
+        else:
+            print(f"Birthdays{' 🎂' if use_emoji else ''}")
+
         for entry in entries:
             age = entry.get_age()
             next_in = entry.next_occurrence_in(today)
