@@ -53,7 +53,7 @@ Enter
 Sleep 1s
 
 # Show the list view
-Type "birthdays list --sort upcoming"
+Type "birthdays list"
 Sleep 500ms
 Enter
 Sleep 6s
