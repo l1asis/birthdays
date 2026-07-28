@@ -218,6 +218,46 @@ def save_database(entries: List[BirthdayEntry], db_path: Path) -> None:
 
 
 # ==========================================
+#          SHELL INTEGRATION APIs
+# ==========================================
+
+
+def get_target_shell_configs() -> List[Path]:
+    """Detect OS and current user shell to return candidate RC file paths."""
+    home = Path.home()
+    candidates: List[Path] = []
+
+    if sys.platform == "win32":
+        # Windows PowerShell Profile locations
+        ps_dirs = [
+            home / "Documents" / "PowerShell",
+            home / "Documents" / "WindowsPowerShell",
+        ]
+        for ps_dir in ps_dirs:
+            candidates.append(ps_dir / "Microsoft.PowerShell_profile.ps1")
+    else:
+        # Linux / macOS Shell Detection
+        user_shell = os.getenv("SHELL", "")
+
+        if "zsh" in user_shell:
+            candidates.append(home / ".zshrc")
+        elif "fish" in user_shell:
+            candidates.append(home / ".config" / "fish" / "config.fish")
+        elif "bash" in user_shell:
+            if sys.platform == "darwin":
+                candidates.append(home / ".bash_profile")
+            candidates.append(home / ".bashrc")
+        else:
+            # Fallback scan for common POSIX config files if $SHELL is ambiguous
+            for rc in [".zshrc", ".bashrc", ".bash_profile"]:
+                if (home / rc).exists():
+                    candidates.append(home / rc)
+
+    return candidates
+
+
+
+# ==========================================
 #            CORE LOGIC APIs
 # ==========================================
 
