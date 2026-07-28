@@ -20,7 +20,7 @@ from dateutil.relativedelta import relativedelta
 from platformdirs import user_data_path
 
 from . import __about__, __version__
-from .emojis import date_to_emoji
+from .emojis import date_to_emoji, should_use_emoji
 
 VCARD = re.compile(r"BEGIN:VCARD.*?END:VCARD", flags=re.DOTALL | re.IGNORECASE)
 FULL_NAME = re.compile(r"^FN(;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE)
@@ -654,7 +654,7 @@ def display_birthdays(
     sort_by: Literal["name", "date", "upcoming", "recent", "age"] = "upcoming",
     sort_order: Literal["asc", "desc"] = "desc",
     view_style: Literal["simple", "table", "calendar"] = "simple",
-    no_emoji: bool = False,
+    use_emoji: bool = True,
 ) -> None:
     """Handle all terminal printing."""
     today = datetime.date.today()
@@ -699,21 +699,18 @@ def display_birthdays(
         )
 
     if view_style == "simple":
-        print(f"Birthdays{' 🎂' if not no_emoji else ''}")
+        print(f"Birthdays{' 🎂' if use_emoji else ''}")
         for entry in entries:
             age = entry.get_age()
             next_in = entry.next_occurrence_in(today)
             prev_in = entry.prev_occurrence_in(today)
 
-            if no_emoji:
-                print(entry)
-            else:
-                emoji = date_to_emoji(entry.year, entry.month, entry.day)
-                print(f"{emoji:<2} {entry}")
+            emoji = date_to_emoji(entry.year, entry.month, entry.day)
+            print(f"{(emoji + '  ') if use_emoji else ''}{entry}")
 
             if entry.is_today():
                 age = f"{to_ordinal(age)} " if age is not None else ""
-                print(f"Has a {age}birthday today{' 🥳' if not no_emoji else '!'}")
+                print(f"Has a {age}birthday today{' 🥳' if use_emoji else '!'}")
             else:
                 age = f"{age} y.o., " if age is not None else ""
                 months = tuple(
@@ -761,9 +758,13 @@ def setup_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Show information about this program",
     )
+    parser.add_argument(
+        "--no-emoji",
+        action="store_true",
+        help="Disable the use of emojis globally",
+    )
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
-    subparsers.required = True
 
     parser_list = subparsers.add_parser("list", help="Display saved birthdays")
     parser_list.add_argument(
@@ -795,11 +796,6 @@ def setup_parser() -> argparse.ArgumentParser:
         choices=["before", "after"],
         default="before",
         help="Fallback leap system when reading dynamically from a .vcf file",
-    )
-    parser_list.add_argument(
-        "--no-emoji",
-        action="store_true",
-        help="Disable the use of emojis",
     )
 
     parser_add = subparsers.add_parser("add", help="Manually add a new birthday")
@@ -837,7 +833,8 @@ def setup_parser() -> argparse.ArgumentParser:
     )
 
     parser_import = subparsers.add_parser(
-        "import", help="Import birthdays from a vCard or JSON file"
+        "import",
+        help="Import birthdays from a vCard or JSON file",
     )
     parser_import.add_argument("file", type=Path, help="Path to the .vcf file")
     parser_import.add_argument(
@@ -858,12 +855,17 @@ def setup_parser() -> argparse.ArgumentParser:
 
 
 def main():
-    if "--about" in sys.argv:
-        print(__about__)
-        sys.exit(0)
-
     parser = setup_parser()
     args = parser.parse_args()
+
+    use_emoji = should_use_emoji(args.no_emoji)
+
+    if args.about:
+        print(__about__ if use_emoji else __about__.replace("🔥", " &"))
+        sys.exit(0)
+
+    if not args.command:
+        parser.error("the following arguments are required: command")
 
     db_path = get_database_path()
 
@@ -888,7 +890,7 @@ def main():
             sort_by=args.sort,
             sort_order=args.order,
             view_style=args.view,
-            no_emoji=args.no_emoji,
+            use_emoji=use_emoji,
         )
 
     elif args.command == "add":
