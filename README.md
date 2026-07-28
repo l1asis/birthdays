@@ -49,14 +49,15 @@ pip install .
 > By default, this sorts by upcoming birthdays in descending order so the most immediate celebrations are right at your cursor.
 
 ```bash
+# Basic list
 birthdays list
+
+# List sorted by age in ascending order
+birthdays list --sort age --order asc
+
+# Temporarily read and display birthdays directly from a file without modifying your local database
+birthdays list --file ./contacts.vcf
 ```
-
-**Options:**
-
-- `--sort`: Choose from `name`, `date`, `upcoming`, `recent`, or `age`.
-- `--order`: Choose `asc` or `desc`.
-- `-f`, `--file`: Temporarily read and display birthdays directly from a `.vcf` or `.json` file without modifying your local database.
 
 ### Adding an Entry
 
