@@ -721,11 +721,11 @@ def display_birthdays(
             prev_in = entry.prev_occurrence_in(today)
 
             emoji = date_to_emoji(entry.year, entry.month, entry.day)
-            print(f"{(emoji + '  ') if use_emoji else ''}{entry}")
+            print(f"{emoji if use_emoji else '->'}  {entry}")
 
             if entry.is_today():
                 age = f"{to_ordinal(age)} " if age is not None else ""
-                print(f"Has a {age}birthday today{' 🥳' if use_emoji else '!'}")
+                print(f"    Has a {age}birthday today{' 🥳' if use_emoji else '!'}")
             else:
                 age = f"{age} y.o., " if age is not None else ""
                 months = tuple(
@@ -744,9 +744,9 @@ def display_birthdays(
                     for delta in (next_in, prev_in)
                 )
                 if sort_by != "recent":
-                    print(f"{age}Next in{months[0]}{days[0]}")
+                    print(f"    {age}Next in{months[0]}{days[0]}")
                 elif sort_by == "recent":
-                    print(f"{age}Previous:{months[1]}{days[1]} ago")
+                    print(f"    {age}Previous:{months[1]}{days[1]} ago")
 
 
 # ==========================================
