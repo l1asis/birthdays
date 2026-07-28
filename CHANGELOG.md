@@ -1,3 +1,10 @@
+# [0.4.0](https://github.com/l1asis/birthdays/compare/0.3.0...0.4.0) (2026-07-28)
+
+
+### Features
+
+* ✨ implement "once per day" option for MOTD  ([#18](https://github.com/l1asis/birthdays/issues/18)) ([a251567](https://github.com/l1asis/birthdays/commit/a2515671a319434462cc8d0c2a3ba7a8d92e9e9f))
+
 # [0.3.0](https://github.com/l1asis/birthdays/compare/0.2.0...0.3.0) (2026-07-28)
 
 
