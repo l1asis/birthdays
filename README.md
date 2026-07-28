@@ -18,6 +18,7 @@
 - **Interactive Merging:** During imports, the CLI intelligently detects duplicates or data collisions and prompts you to safely merge them
 - **Leapling Support:** Configure how leap year birthdays (February 29th) are handled in non-leap years, choosing to celebrate either the day before or the day after
 - **Festive UI:** Every date is assigned a unique, deterministic emoji to keep the terminal vibe bright and colorful *(can be disabled via a global flag or environment variables)*
+- **Shell MOTD:** Automatically display a summary of upcoming birthdays when opening a new terminal session, complete with safe, automated hooks for `.bashrc`, `.zshrc`, `config.fish`, and `PowerShell` profiles.
 
 ## Requirements
 
@@ -94,6 +95,36 @@ birthdays delete "John Doe"
 ```bash
 birthdays import ./contacts.vcf
 ```
+
+### Shell MOTD (Message of the Day)
+
+> [!TIP]
+> You can automatically display a minimal summary of upcoming birthdays every time you open a new terminal session.
+
+**Display the MOTD manually:**
+
+```bash
+birthdays motd
+```
+
+**Enable the startup hook:**
+
+```bash
+birthdays motd enable --days 14 --limit 5 --quiet-if-empty
+```
+
+This automatically detects your shell and injects an easily removable sentinel block. Running this command again with new flags will update the existing block in-place.
+
+> [!NOTE]
+> You can pass a `--rc-file` flag if you use a custom shell config.
+
+**Disable the startup hook:**
+
+```bash
+birthdays motd disable
+```
+
+This safely removes the MOTD sentinel block from your shell configuration without affecting surrounding custom code.
 
 ## Configurations
 
