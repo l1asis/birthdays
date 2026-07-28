@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, List, Literal, Optional, overload
 
 from dateutil.relativedelta import relativedelta
-from platformdirs import user_data_path
+from platformdirs import user_cache_path, user_data_path
 
 from . import __about__, __version__
 from .emojis import date_to_emoji, should_use_emoji
@@ -217,6 +217,22 @@ def save_database(entries: List[BirthdayEntry], db_path: Path) -> None:
         json.dump(dictionaries, file, indent=4)
 
 
+def should_run_today() -> bool:
+    """Check if the MOTD has already been displayed today."""
+    cache_dir = user_cache_path("birthdays", "l1asis", ensure_exists=True)
+    cache_file = cache_dir / "motd_last_run.txt"
+
+    today_str = datetime.date.today().isoformat()
+
+    if cache_file.exists():
+        last_run = cache_file.read_text(encoding="utf-8").strip()
+        if last_run == today_str:
+            return False
+
+    cache_file.write_text(today_str, encoding="utf-8")
+    return True
+
+
 # ==========================================
 #          SHELL INTEGRATION APIs
 # ==========================================
@@ -269,6 +285,8 @@ def build_motd_command(args: argparse.Namespace) -> str:
         cmd_parts.append("--show-date")
     if getattr(args, "no_emoji", False):
         cmd_parts.append("--no-emoji")
+    if getattr(args, "once_per_day", False):
+        cmd_parts.append("--once-per-day")
 
     return " ".join(cmd_parts)
 
@@ -1072,6 +1090,11 @@ def setup_parser() -> argparse.ArgumentParser:
     parser_motd.add_argument(
         "--show-date", action="store_true", help="Include today's date in title"
     )
+    parser_motd.add_argument(
+        "--once-per-day",
+        action="store_true",
+        help="Only display the MOTD once per calendar day",
+    )
 
     return parser
 
@@ -1216,6 +1239,9 @@ def main():
         elif args.action == "disable":
             disable_motd_hook()
         else:
+            if args.once_per_day and not should_run_today():
+                sys.exit(0)
+
             entries = load_database(db_path)
             display_motd(
                 entries,
