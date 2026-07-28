@@ -17,7 +17,7 @@
 - **Smart Imports:** Import contacts directly from `.vcf` vCard files or JSON databases
 - **Interactive Merging:** During imports, the CLI intelligently detects duplicates or data collisions and prompts you to safely merge them
 - **Leapling Support:** Configure how leap year birthdays (February 29th) are handled in non-leap years, choosing to celebrate either the day before or the day after
-- **Festive UI:** Every date is assigned a unique, deterministic emoji to keep the terminal vibe bright and colorful *(includes a `--no-emoji` flag)*
+- **Festive UI:** Every date is assigned a unique, deterministic emoji to keep the terminal vibe bright and colorful *(can be disabled via a global flag or environment variables)*
 
 ## Requirements
 
@@ -93,6 +93,20 @@ birthdays delete "John Doe"
 ```bash
 birthdays import ./contacts.vcf
 ```
+
+## Configurations
+
+### Emojis
+
+You can disable emojis globally across all subcommands by placing the `--no-emoji` flag *before* the subcommand (e.g., `birthdays --no-emoji list`).
+
+For a more permanent solution, `birthdays` respects the following environment variables:
+
+- `BIRTHDAYS_NO_EMOJI=1` (or `true`, `yes`)
+- `NO_EMOJI=1` (the widely adopted community convention)
+
+> [!NOTE]
+> The method for setting environment variables depends on your operating system and terminal. Please search online for instructions specific to your OS.
 
 ## Contributing
 
