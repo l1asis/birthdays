@@ -110,10 +110,10 @@ birthdays motd
 **Enable the startup hook:**
 
 ```bash
-birthdays motd enable --days 14 --limit 5 --quiet-if-empty
+birthdays motd enable --days 14 --limit 5 --quiet-if-empty --once-per-day
 ```
 
-This automatically detects your shell and injects an easily removable sentinel block. Running this command again with new flags will update the existing block in-place.
+This automatically detects your shell and injects an easily removable sentinel block. Running this command again with new flags will update the existing block in-place. The `--once-per-day` flag ensures the summary is only printed the first time you open a terminal each day, preventing terminal spam.
 
 > [!NOTE]
 > You can pass a `--rc-file` flag if you use a custom shell config.
