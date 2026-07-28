@@ -1,3 +1,4 @@
+import os
 from hashlib import sha256
 
 # fmt: off
@@ -130,3 +131,24 @@ def date_to_emoji(year: int | None, month: int, day: int) -> str:
     hashed = sha256(encoded).hexdigest()
 
     return ALL_EMOJIS[int(hashed, 16) % len(ALL_EMOJIS)]
+
+
+def should_use_emoji(cli_no_emoji: bool) -> bool:
+    """Resolve whether to display emojis based on CLI and env vars"""
+    if cli_no_emoji:
+        return False
+
+    if (bday_env := os.getenv("BIRTHDAYS_NO_EMOJI")) is not None:
+        return not _is_env_var_truthy(bday_env)
+
+    if (env := os.getenv("NO_EMOJI")) is not None:
+        return not _is_env_var_truthy(env)
+
+    return True
+
+
+def _is_env_var_truthy(value: str | None) -> bool:
+    """Check if an environment variable string represents a True value"""
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "on"}
