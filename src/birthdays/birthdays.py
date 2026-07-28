@@ -20,7 +20,7 @@ from dateutil.relativedelta import relativedelta
 from platformdirs import user_data_path
 
 from . import __about__, __version__
-from .emojis import date_to_emoji
+from .emojis import date_to_emoji, should_use_emoji
 
 VCARD = re.compile(r"BEGIN:VCARD.*?END:VCARD", flags=re.DOTALL | re.IGNORECASE)
 FULL_NAME = re.compile(r"^FN(;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE)
@@ -29,6 +29,13 @@ DATE = re.compile(r"^(\d{4}|--)?-?(0[1-9]|1[0-2])-?(0[1-9]|[12]\d|3[01])$")
 NOTE = re.compile(r"^NOTE(;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE)
 UNFOLD = re.compile(r"\r?\n[ \t]")  # glues lines that start with a space or tab
 UNFOLD_SOFT = re.compile(r"=\r?\n")  # glues lines that end with an '='
+
+MOTD_MARKER_START = "# >>> birthdays motd >>>"
+MOTD_MARKER_END = "# <<< birthdays motd <<<"
+MOTD_BLOCK_REGEX = re.compile(
+    rf"{re.escape(MOTD_MARKER_START)}.*?{re.escape(MOTD_MARKER_END)}\n?",
+    flags=re.DOTALL,
+)
 
 # ==========================================
 #               DATA MODELS
@@ -208,6 +215,120 @@ def save_database(entries: List[BirthdayEntry], db_path: Path) -> None:
     dictionaries = tuple(asdict(entry) for entry in entries)
     with open(db_path, "w", encoding="utf-8") as file:
         json.dump(dictionaries, file, indent=4)
+
+
+# ==========================================
+#          SHELL INTEGRATION APIs
+# ==========================================
+
+
+def get_target_shell_configs() -> List[Path]:
+    """Detect OS and current user shell to return candidate RC file paths."""
+    home = Path.home()
+    candidates: List[Path] = []
+
+    if sys.platform == "win32":
+        # Windows PowerShell Profile locations
+        ps_dirs = [
+            home / "Documents" / "PowerShell",
+            home / "Documents" / "WindowsPowerShell",
+        ]
+        for ps_dir in ps_dirs:
+            candidates.append(ps_dir / "Microsoft.PowerShell_profile.ps1")
+    else:
+        # Linux / macOS Shell Detection
+        user_shell = os.getenv("SHELL", "")
+
+        if "zsh" in user_shell:
+            candidates.append(home / ".zshrc")
+        elif "fish" in user_shell:
+            candidates.append(home / ".config" / "fish" / "config.fish")
+        elif "bash" in user_shell:
+            if sys.platform == "darwin":
+                candidates.append(home / ".bash_profile")
+            candidates.append(home / ".bashrc")
+        else:
+            # Fallback scan for common POSIX config files if $SHELL is ambiguous
+            for rc in [".zshrc", ".bashrc", ".bash_profile"]:
+                if (home / rc).exists():
+                    candidates.append(home / rc)
+
+    return candidates
+
+
+def build_motd_command(args: argparse.Namespace) -> str:
+    """Reconstruct the exact command string from parsed flags."""
+    cmd_parts = ["birthdays", "motd"]
+    if args.days != 7:
+        cmd_parts.append(f"--days {args.days}")
+    if args.limit != 3:
+        cmd_parts.append(f"--limit {args.limit}")
+    if getattr(args, "quiet_if_empty", False):
+        cmd_parts.append("--quiet-if-empty")
+    if getattr(args, "show_date", False):
+        cmd_parts.append("--show-date")
+    if getattr(args, "no_emoji", False):
+        cmd_parts.append("--no-emoji")
+
+    return " ".join(cmd_parts)
+
+
+def enable_motd_hook(args: argparse.Namespace) -> None:
+    """Inject or update the MOTD startup block in the shell configuration."""
+    if getattr(args, "rc_file", None):
+        configs = [args.rc_file]
+    else:
+        configs = get_target_shell_configs()
+
+    if not configs:
+        print("Error: Could not determine shell config file to hook into.")
+        sys.exit(1)
+
+    motd_cmd = build_motd_command(args)
+    block_content = f"{MOTD_MARKER_START}\n{motd_cmd}\n{MOTD_MARKER_END}\n"
+
+    for config_path in configs:
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        existing_text = (
+            config_path.read_text(encoding="utf-8") if config_path.exists() else ""
+        )
+
+        match = MOTD_BLOCK_REGEX.search(existing_text)
+        if match:
+            current_block = match.group(0)
+            if current_block.strip() == block_content.strip():
+                print(f"MOTD is already enabled and up to date in '{config_path}'.")
+                continue
+            else:
+                new_text = MOTD_BLOCK_REGEX.sub(block_content, existing_text)
+                config_path.write_text(new_text, encoding="utf-8")
+                print(f"Updated MOTD hook parameters in '{config_path}'.")
+                continue
+
+        separator = "" if not existing_text or existing_text.endswith("\n") else "\n"
+        new_text = f"{existing_text}{separator}\n{block_content}"
+        config_path.write_text(new_text, encoding="utf-8")
+        print(f"Successfully enabled MOTD hook in '{config_path}'.")
+
+
+def disable_motd_hook() -> None:
+    """Remove the MOTD startup block from shell configuration files."""
+    configs = get_target_shell_configs()
+    removed_any = False
+
+    for config_path in configs:
+        if not config_path.exists():
+            continue
+
+        existing_text = config_path.read_text(encoding="utf-8")
+        if MOTD_BLOCK_REGEX.search(existing_text):
+            new_text = MOTD_BLOCK_REGEX.sub("", existing_text).rstrip() + "\n"
+            config_path.write_text(new_text, encoding="utf-8")
+            print(f"Disabled MOTD hook in '{config_path}'.")
+            removed_any = True
+
+    if not removed_any:
+        print("MOTD hook is not currently enabled in any detected shell config.")
 
 
 # ==========================================
@@ -649,14 +770,12 @@ def to_ordinal(number: int) -> str:
     return f"{n}th"
 
 
-def display_birthdays(
+def sort_entries(
     entries: List[BirthdayEntry],
     sort_by: Literal["name", "date", "upcoming", "recent", "age"] = "upcoming",
     sort_order: Literal["asc", "desc"] = "desc",
-    view_style: Literal["simple", "table", "calendar"] = "simple",
-    no_emoji: bool = False,
-) -> None:
-    """Handle all terminal printing."""
+) -> List[BirthdayEntry]:
+    """Sort birthday entries by criteria and order."""
     today = datetime.date.today()
 
     if sort_by == "name":
@@ -698,22 +817,42 @@ def display_birthdays(
             reverse=sort_order == "desc",
         )
 
+    return entries
+
+
+def display_birthdays(
+    entries: List[BirthdayEntry],
+    sort_by: Literal["name", "date", "upcoming", "recent", "age"] = "upcoming",
+    sort_order: Literal["asc", "desc"] = "desc",
+    view_style: Literal["simple", "table", "calendar"] = "simple",
+    use_emoji: bool = True,
+    should_sort: bool = True,
+    show_header_date: bool = False,
+) -> None:
+    """Handle all terminal printing."""
+    today = datetime.date.today()
+
+    if should_sort:
+        entries = sort_entries(entries, sort_by, sort_order)
+
     if view_style == "simple":
-        print(f"Birthdays{' 🎂' if not no_emoji else ''}")
+        if show_header_date:
+            date_str = today.strftime("%A, %b %d")
+            print(f"Birthdays for {date_str}{' 🎂' if use_emoji else ''}")
+        else:
+            print(f"Birthdays{' 🎂' if use_emoji else ''}")
+
         for entry in entries:
             age = entry.get_age()
             next_in = entry.next_occurrence_in(today)
             prev_in = entry.prev_occurrence_in(today)
 
-            if no_emoji:
-                print(entry)
-            else:
-                emoji = date_to_emoji(entry.year, entry.month, entry.day)
-                print(f"{emoji:<2} {entry}")
+            emoji = date_to_emoji(entry.year, entry.month, entry.day)
+            print(f"{emoji if use_emoji else '->'}  {entry}")
 
             if entry.is_today():
                 age = f"{to_ordinal(age)} " if age is not None else ""
-                print(f"Has a {age}birthday today{' 🥳' if not no_emoji else '!'}")
+                print(f"    Has a {age}birthday today{' 🥳' if use_emoji else '!'}")
             else:
                 age = f"{age} y.o., " if age is not None else ""
                 months = tuple(
@@ -732,9 +871,62 @@ def display_birthdays(
                     for delta in (next_in, prev_in)
                 )
                 if sort_by != "recent":
-                    print(f"{age}Next in{months[0]}{days[0]}")
+                    print(f"    {age}Next in{months[0]}{days[0]}")
                 elif sort_by == "recent":
-                    print(f"{age}Previous:{months[1]}{days[1]} ago")
+                    print(f"    {age}Previous:{months[1]}{days[1]} ago")
+
+
+def display_motd(
+    entries: List[BirthdayEntry],
+    horizon_days: int = 7,
+    limit: int = 3,
+    quiet_if_empty: bool = False,
+    use_emoji: bool = True,
+    show_header_date: bool = False,
+) -> None:
+    """Print a minimal summary of upcoming birthdays."""
+    today = datetime.date.today()
+
+    upcoming = [
+        entry
+        for entry in entries
+        if (entry.get_next_occurrence(today) - today).days <= horizon_days
+    ]
+
+    if not upcoming and not quiet_if_empty:
+        print(
+            f"No upcoming birthdays for the next {horizon_days} "
+            f"day{'s' if horizon_days != 1 else ''}!"
+        )
+        print("Run 'birthdays list' to see all.")
+        return
+    elif not upcoming and quiet_if_empty:
+        return
+
+    upcoming = sort_entries(upcoming, sort_by="upcoming", sort_order="asc")
+    printable = upcoming[:limit]
+    truncated = upcoming[limit:]
+
+    more_today_count = sum(1 for e in truncated if e.is_today())
+    more_upcoming_count = len(truncated) - more_today_count
+
+    display_birthdays(
+        printable,
+        view_style="simple",
+        use_emoji=use_emoji,
+        should_sort=False,
+        show_header_date=show_header_date,
+    )
+
+    if more_today_count > 0:
+        print(f"...and {more_today_count} more today!")
+
+    if more_upcoming_count > 0:
+        timeframe = (
+            "this week" if horizon_days == 7 else f"in the next {horizon_days} days"
+        )
+        print(f"...and {more_upcoming_count} more upcoming {timeframe}.")
+        print("Run 'birthdays list' to see all.")
 
 
 # ==========================================
@@ -761,9 +953,13 @@ def setup_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Show information about this program",
     )
+    parser.add_argument(
+        "--no-emoji",
+        action="store_true",
+        help="Disable the use of emojis globally",
+    )
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
-    subparsers.required = True
 
     parser_list = subparsers.add_parser("list", help="Display saved birthdays")
     parser_list.add_argument(
@@ -795,11 +991,6 @@ def setup_parser() -> argparse.ArgumentParser:
         choices=["before", "after"],
         default="before",
         help="Fallback leap system when reading dynamically from a .vcf file",
-    )
-    parser_list.add_argument(
-        "--no-emoji",
-        action="store_true",
-        help="Disable the use of emojis",
     )
 
     parser_add = subparsers.add_parser("add", help="Manually add a new birthday")
@@ -837,7 +1028,8 @@ def setup_parser() -> argparse.ArgumentParser:
     )
 
     parser_import = subparsers.add_parser(
-        "import", help="Import birthdays from a vCard or JSON file"
+        "import",
+        help="Import birthdays from a vCard or JSON file",
     )
     parser_import.add_argument("file", type=Path, help="Path to the .vcf file")
     parser_import.add_argument(
@@ -854,16 +1046,48 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Default leap system to assign to imported contacts",
     )
 
+    parser_motd = subparsers.add_parser(
+        "motd", help="Display the MOTD or manage the shell startup hook"
+    )
+    parser_motd.add_argument(
+        "action",
+        nargs="?",
+        choices=["enable", "disable"],
+        help="Optional action: 'enable' or 'disable' shell startup hook.",
+    )
+    parser_motd.add_argument(
+        "--rc-file",
+        type=Path,
+        help="Path to a custom shell config file (overrides automatic detection)",
+    )
+    parser_motd.add_argument(
+        "--days", type=int, default=7, help="Days ahead to check for birthdays"
+    )
+    parser_motd.add_argument(
+        "--limit", type=int, default=3, help="Max entries to print directly"
+    )
+    parser_motd.add_argument(
+        "--quiet-if-empty", action="store_true", help="Exit silently if no birthdays"
+    )
+    parser_motd.add_argument(
+        "--show-date", action="store_true", help="Include today's date in title"
+    )
+
     return parser
 
 
 def main():
-    if "--about" in sys.argv:
-        print(__about__)
-        sys.exit(0)
-
     parser = setup_parser()
     args = parser.parse_args()
+
+    use_emoji = should_use_emoji(args.no_emoji)
+
+    if args.about:
+        print(__about__ if use_emoji else __about__.replace("🔥", " &"))
+        sys.exit(0)
+
+    if not args.command:
+        parser.error("the following arguments are required: command")
 
     db_path = get_database_path()
 
@@ -888,7 +1112,7 @@ def main():
             sort_by=args.sort,
             sort_order=args.order,
             view_style=args.view,
-            no_emoji=args.no_emoji,
+            use_emoji=use_emoji,
         )
 
     elif args.command == "add":
@@ -985,6 +1209,22 @@ def main():
 
         added_count = len(merged_db) - len(db)
         print(f"\nImport complete. The database grew by {added_count} entries.")
+
+    elif args.command == "motd":
+        if args.action == "enable":
+            enable_motd_hook(args)
+        elif args.action == "disable":
+            disable_motd_hook()
+        else:
+            entries = load_database(db_path)
+            display_motd(
+                entries,
+                horizon_days=args.days,
+                limit=args.limit,
+                quiet_if_empty=args.quiet_if_empty,
+                use_emoji=use_emoji,
+                show_header_date=args.show_date,
+            )
 
     sys.exit(0)
 
