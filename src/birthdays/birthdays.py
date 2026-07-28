@@ -649,14 +649,12 @@ def to_ordinal(number: int) -> str:
     return f"{n}th"
 
 
-def display_birthdays(
+def sort_entries(
     entries: List[BirthdayEntry],
     sort_by: Literal["name", "date", "upcoming", "recent", "age"] = "upcoming",
     sort_order: Literal["asc", "desc"] = "desc",
-    view_style: Literal["simple", "table", "calendar"] = "simple",
-    use_emoji: bool = True,
-) -> None:
-    """Handle all terminal printing."""
+) -> List[BirthdayEntry]:
+    """Sort birthday entries by criteria and order."""
     today = datetime.date.today()
 
     if sort_by == "name":
@@ -697,6 +695,23 @@ def display_birthdays(
             ),
             reverse=sort_order == "desc",
         )
+
+    return entries
+
+
+def display_birthdays(
+    entries: List[BirthdayEntry],
+    sort_by: Literal["name", "date", "upcoming", "recent", "age"] = "upcoming",
+    sort_order: Literal["asc", "desc"] = "desc",
+    view_style: Literal["simple", "table", "calendar"] = "simple",
+    use_emoji: bool = True,
+    should_sort: bool = True,
+) -> None:
+    """Handle all terminal printing."""
+    today = datetime.date.today()
+
+    if should_sort:
+        entries = sort_entries(entries, sort_by, sort_order)
 
     if view_style == "simple":
         print(f"Birthdays{' 🎂' if use_emoji else ''}")
