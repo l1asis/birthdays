@@ -256,6 +256,80 @@ def get_target_shell_configs() -> List[Path]:
     return candidates
 
 
+def build_motd_command(args: argparse.Namespace) -> str:
+    """Reconstruct the exact command string from parsed flags."""
+    cmd_parts = ["birthdays", "motd"]
+    if args.days != 7:
+        cmd_parts.append(f"--days {args.days}")
+    if args.limit != 3:
+        cmd_parts.append(f"--limit {args.limit}")
+    if getattr(args, "quiet_if_empty", False):
+        cmd_parts.append("--quiet-if-empty")
+    if getattr(args, "show_date", False):
+        cmd_parts.append("--show-date")
+    if getattr(args, "no_emoji", False):
+        cmd_parts.append("--no-emoji")
+
+    return " ".join(cmd_parts)
+
+
+def enable_motd_hook(args: argparse.Namespace) -> None:
+    """Inject or update the MOTD startup block in the shell configuration."""
+    if getattr(args, "rc_file", None):
+        configs = [args.rc_file]
+    else:
+        configs = get_target_shell_configs()
+
+    if not configs:
+        print("Error: Could not determine shell config file to hook into.")
+        sys.exit(1)
+
+    motd_cmd = build_motd_command(args)
+    block_content = f"{MOTD_MARKER_START}\n{motd_cmd}\n{MOTD_MARKER_END}\n"
+
+    for config_path in configs:
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        existing_text = (
+            config_path.read_text(encoding="utf-8") if config_path.exists() else ""
+        )
+
+        match = MOTD_BLOCK_REGEX.search(existing_text)
+        if match:
+            current_block = match.group(0)
+            if current_block.strip() == block_content.strip():
+                print(f"MOTD is already enabled and up to date in '{config_path}'.")
+                continue
+            else:
+                new_text = MOTD_BLOCK_REGEX.sub(block_content, existing_text)
+                config_path.write_text(new_text, encoding="utf-8")
+                print(f"Updated MOTD hook parameters in '{config_path}'.")
+                continue
+
+        separator = "" if not existing_text or existing_text.endswith("\n") else "\n"
+        new_text = f"{existing_text}{separator}\n{block_content}"
+        config_path.write_text(new_text, encoding="utf-8")
+        print(f"Successfully enabled MOTD hook in '{config_path}'.")
+
+
+def disable_motd_hook() -> None:
+    """Remove the MOTD startup block from shell configuration files."""
+    configs = get_target_shell_configs()
+    removed_any = False
+
+    for config_path in configs:
+        if not config_path.exists():
+            continue
+
+        existing_text = config_path.read_text(encoding="utf-8")
+        if MOTD_BLOCK_REGEX.search(existing_text):
+            new_text = MOTD_BLOCK_REGEX.sub("", existing_text).rstrip() + "\n"
+            config_path.write_text(new_text, encoding="utf-8")
+            print(f"Disabled MOTD hook in '{config_path}'.")
+            removed_any = True
+
+    if not removed_any:
+        print("MOTD hook is not currently enabled in any detected shell config.")
+
 
 # ==========================================
 #            CORE LOGIC APIs
@@ -919,16 +993,6 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Fallback leap system when reading dynamically from a .vcf file",
     )
 
-    parser_motd = subparsers.add_parser("motd", help="Print a minimal MOTD summary")
-    parser_motd.add_argument("--days", type=int, default=7, help="Days to look ahead")
-    parser_motd.add_argument("--limit", type=int, default=3, help="Max entries to show")
-    parser_motd.add_argument(
-        "--quiet-if-empty", action="store_true", help="Exit silently if no birthdays"
-    )
-    parser_motd.add_argument(
-        "--show-date", action="store_true", help="Include today's date in the header"
-    )
-
     parser_add = subparsers.add_parser("add", help="Manually add a new birthday")
     parser_add.add_argument("name", type=str, help="Full name of the person")
     parser_add.add_argument("date", type=str, help="Birthday (YYYY-MM-DD | MM-DD)")
@@ -982,6 +1046,33 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Default leap system to assign to imported contacts",
     )
 
+    parser_motd = subparsers.add_parser(
+        "motd", help="Display the MOTD or manage the shell startup hook"
+    )
+    parser_motd.add_argument(
+        "action",
+        nargs="?",
+        choices=["enable", "disable"],
+        help="Optional action: 'enable' or 'disable' shell startup hook.",
+    )
+    parser_motd.add_argument(
+        "--rc-file",
+        type=Path,
+        help="Path to a custom shell config file (overrides automatic detection)",
+    )
+    parser_motd.add_argument(
+        "--days", type=int, default=7, help="Days ahead to check for birthdays"
+    )
+    parser_motd.add_argument(
+        "--limit", type=int, default=3, help="Max entries to print directly"
+    )
+    parser_motd.add_argument(
+        "--quiet-if-empty", action="store_true", help="Exit silently if no birthdays"
+    )
+    parser_motd.add_argument(
+        "--show-date", action="store_true", help="Include today's date in title"
+    )
+
     return parser
 
 
@@ -1022,17 +1113,6 @@ def main():
             sort_order=args.order,
             view_style=args.view,
             use_emoji=use_emoji,
-        )
-
-    elif args.command == "motd":
-        entries = load_database(db_path)
-        display_motd(
-            entries,
-            horizon_days=args.days,
-            limit=args.limit,
-            quiet_if_empty=args.quiet_if_empty,
-            use_emoji=use_emoji,
-            show_header_date=args.show_date,
         )
 
     elif args.command == "add":
@@ -1129,6 +1209,22 @@ def main():
 
         added_count = len(merged_db) - len(db)
         print(f"\nImport complete. The database grew by {added_count} entries.")
+
+    elif args.command == "motd":
+        if args.action == "enable":
+            enable_motd_hook(args)
+        elif args.action == "disable":
+            disable_motd_hook()
+        else:
+            entries = load_database(db_path)
+            display_motd(
+                entries,
+                horizon_days=args.days,
+                limit=args.limit,
+                quiet_if_empty=args.quiet_if_empty,
+                use_emoji=use_emoji,
+                show_header_date=args.show_date,
+            )
 
     sys.exit(0)
 
