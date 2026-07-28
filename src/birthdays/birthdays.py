@@ -30,6 +30,13 @@ NOTE = re.compile(r"^NOTE(;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE)
 UNFOLD = re.compile(r"\r?\n[ \t]")  # glues lines that start with a space or tab
 UNFOLD_SOFT = re.compile(r"=\r?\n")  # glues lines that end with an '='
 
+MOTD_MARKER_START = "# >>> birthdays motd >>>"
+MOTD_MARKER_END = "# <<< birthdays motd <<<"
+MOTD_BLOCK_REGEX = re.compile(
+    rf"{re.escape(MOTD_MARKER_START)}.*?{re.escape(MOTD_MARKER_END)}\n?",
+    flags=re.DOTALL,
+)
+
 # ==========================================
 #               DATA MODELS
 # ==========================================
