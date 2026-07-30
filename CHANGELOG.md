@@ -1,3 +1,10 @@
+## [0.4.1](https://github.com/l1asis/birthdays/compare/0.4.0...0.4.1) (2026-07-30)
+
+
+### Bug Fixes
+
+* 🐛 clarify note merging prompts ([7f2a8f7](https://github.com/l1asis/birthdays/commit/7f2a8f7748a7efc7c82c0fbdc5ce252f27b59cf6))
+
 # [0.4.0](https://github.com/l1asis/birthdays/compare/0.3.0...0.4.0) (2026-07-28)
 
 
