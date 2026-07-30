@@ -464,17 +464,53 @@ def merge_pair(
 ) -> BirthdayEntry:
     """Combine data of two entries meaningfully."""
 
-    merged_notes = tuple(n for n in (existing.notes, incoming.notes) if n)
+    existing_note = (
+        existing.notes.strip() if existing.notes and existing.notes.strip() else None
+    )
+    incoming_note = (
+        incoming.notes.strip() if incoming.notes and incoming.notes.strip() else None
+    )
+
+    merged_notes = tuple(n for n in (existing_note, incoming_note) if n)
     merged_notes = "; ".join(merged_notes) if merged_notes else None
 
     if interactive:
-        notes_choice = choose(("Existing", "Incoming", "Merge"))
-        if notes_choice == "1":
-            final_notes = existing.notes
-        elif notes_choice == "2":
-            final_notes = incoming.notes
+        if existing_note != incoming_note:
+            final_notes = None
+            if not existing_note:
+                if confirm(
+                    f"Incoming contact has a note: {incoming_note!r}. Keep it?",
+                    required=True,
+                ):
+                    final_notes = incoming_note
+            elif not incoming_note:
+                if not confirm(
+                    "Incoming contact has no notes. "
+                    f"Delete existing note ({existing_note!r})?",
+                    required=True,
+                ):
+                    final_notes = existing_note
+            else:
+                options = (
+                    f"Keep existing: {existing_note!r}",
+                    f"Keep incoming: {incoming_note!r}",
+                    f"Merge both:    {merged_notes}",
+                )
+
+                notes_choice = choose(
+                    options,
+                    prompt="\nNotes differ. How would you like to resolve this?",
+                    required=True,
+                )
+
+                if notes_choice == "1":
+                    final_notes = existing_note
+                elif notes_choice == "2":
+                    final_notes = incoming_note
+                else:
+                    final_notes = merged_notes
         else:
-            final_notes = merged_notes
+            final_notes = existing_note
 
         return BirthdayEntry(
             existing.id,
@@ -544,11 +580,15 @@ def merge_entries(
             else:
                 match = existing_map[new_entry.full_name][0]
 
+            match_note = (match.notes.strip() or None) if match.notes else None
+            new_note = (new_entry.notes.strip() or None) if new_entry.notes else None
+
             if (
                 match.month == new_entry.month
                 and match.day == new_entry.day
                 and match.year == new_entry.year
-                and match.notes == new_entry.notes
+                and match.leap_system == new_entry.leap_system
+                and match_note == new_note
             ):
                 continue
 
@@ -1231,7 +1271,26 @@ def main():
         save_database(merged_db, db_path)
 
         added_count = len(merged_db) - len(db)
-        print(f"\nImport complete. The database grew by {added_count} entries.")
+
+        id_to_entry_map = {e.id: e for e in db}
+
+        updated_count = sum(
+            1
+            for e in merged_db
+            if e.id in id_to_entry_map and e != id_to_entry_map[e.id]
+        )
+
+        print("\nImport complete.")
+        if not added_count and not updated_count:
+            print("The database was left unchanged.")
+        else:
+            if added_count:
+                print(f"Added {added_count} entr{'y' if added_count == 1 else 'ies'}.")
+            if updated_count:
+                print(
+                    f"Updated {updated_count} "
+                    f"entr{'y' if updated_count == 1 else 'ies'}."
+                )
 
     elif args.command == "motd":
         if args.action == "enable":
