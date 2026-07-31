@@ -1465,6 +1465,148 @@ def display_motd(
         print("Run 'birthdays list' to see all.")
 
 
+def build_alarm(alarm_days: int, alarm_time_str: str, alarm_summary: str) -> Any:
+    """Construct a VALARM component for an iCalendar event."""
+    from icalendar import Alarm
+
+    if alarm_days < 0:
+        return None
+
+    try:
+        hour, minute = map(int, alarm_time_str.split(":"))
+    except ValueError:
+        print(f"Warning: Invalid alarm-time format '{alarm_time_str}'. Using 09:00.")
+        hour, minute = 9, 0
+
+    alarm = Alarm()
+    alarm["action"] = "DISPLAY"
+    alarm["description"] = alarm_summary
+
+    trigger_delta = datetime.timedelta(days=-alarm_days, hours=hour, minutes=minute)
+    alarm["trigger"] = trigger_delta
+
+    return alarm
+
+
+def build_ical(
+    entries: List[BirthdayEntry],
+    years: int,
+    alarm_days: int,
+    alarm_time: str,
+    title_tmpl: str,
+    desc_tmpl: str,
+    desc_fallback_tmpl: str,
+    alarm_desc_tmpl: str,
+) -> Any:
+    """Generate an RFC 5545 compliant iCalendar object from birthday entries."""
+    from icalendar import Calendar, Event
+
+    cal = Calendar()
+    cal["prodid"] = "-//l1asis//birthdays//EN"
+    cal["version"] = "2.0"
+
+    today = datetime.date.today()
+
+    def apply_template(
+        tmpl: str, entry: BirthdayEntry, age_val: int | None, year_val: int | None
+    ) -> str:
+        """Safely replace variables without crashing on stray brackets."""
+        if not tmpl:
+            return ""
+
+        res = tmpl.replace("{name}", entry.full_name)
+        res = res.replace(
+            "{first_name}", entry.name_parts.get("first") or entry.full_name
+        )
+        res = res.replace("{last_name}", entry.name_parts.get("last") or "")
+        res = res.replace("{year}", str(year_val) if year_val else "Unknown")
+
+        if age_val is not None:
+            res = res.replace("{age}", str(age_val))
+            res = res.replace("{ordinal_age}", to_ordinal(age_val))
+        else:
+            res = res.replace("{age}", "")
+            res = res.replace("{ordinal_age}", "")
+
+        return res.replace("  ", " ").strip()
+
+    for entry in entries:
+        anchor_date = entry.get_next_occurrence(today)
+
+        if years == 0:
+            event = Event()
+            event["uid"] = entry.id
+            event["dtstamp"] = datetime.datetime.now()
+
+            start_year = entry.year if entry.year is not None else anchor_date.year
+            dtstart = (
+                datetime.date(start_year, entry.month, entry.day)
+                if entry.year
+                else anchor_date
+            )
+            event["dtstart"] = dtstart
+
+            title = apply_template(title_tmpl, entry, None, entry.year)
+            desc = apply_template(desc_fallback_tmpl, entry, None, entry.year)
+            alarm_summary = apply_template(alarm_desc_tmpl, entry, None, entry.year)
+
+            event["summary"] = title
+            if desc:
+                event["description"] = desc
+
+            rrule: dict[str, str | int] = {"freq": "yearly"}
+            if entry.month == 2 and entry.day == 29:
+                if entry.leap_system == "before":
+                    rrule["bymonth"] = 2
+                    rrule["bymonthday"] = -1
+                else:
+                    rrule["byyearday"] = 60
+            event["rrule"] = rrule
+
+            alarm = build_alarm(alarm_days, alarm_time, alarm_summary)
+            if alarm:
+                event.add_component(alarm)
+
+            cal.add_component(event)
+
+        else:
+            current_year = anchor_date.year
+            for i in range(years):
+                target_year = current_year + i
+                exact_date = leapling_safe_date(
+                    target_year, entry.month, entry.day, entry.leap_system
+                )
+
+                event = Event()
+                event["uid"] = f"{entry.id}-{target_year}"
+                event["dtstamp"] = datetime.datetime.now()
+                event["dtstart"] = exact_date
+
+                age_val = (target_year - entry.year) if entry.year is not None else None
+
+                title = apply_template(title_tmpl, entry, age_val, entry.year)
+                alarm_summary = apply_template(
+                    alarm_desc_tmpl, entry, age_val, entry.year
+                )
+
+                if age_val is not None:
+                    desc = apply_template(desc_tmpl, entry, age_val, entry.year)
+                else:
+                    desc = apply_template(desc_fallback_tmpl, entry, None, entry.year)
+
+                event["summary"] = title
+                if desc:
+                    event["description"] = desc
+
+                alarm = build_alarm(alarm_days, alarm_time, alarm_summary)
+                if alarm:
+                    event.add_component(alarm)
+
+                cal.add_component(event)
+
+    return cal
+
+
 # ==========================================
 #               ARGPARSE CLI
 # ==========================================
@@ -1701,6 +1843,101 @@ def setup_parser() -> argparse.ArgumentParser:
         "--force",
         action="store_true",
         help="Overwrite existing name parts with newly parsed ones from the full name",
+    )
+
+    parser_export = subparsers.add_parser(
+        "export", help="Export birthdays to an iCalendar (.ics) file"
+    )
+    parser_export.add_argument(
+        "output",
+        type=Path,
+        nargs="?",
+        default=Path("./birthdays.ics"),
+        help="Path to the output .ics file (default: ./birthdays.ics)",
+    )
+    parser_export.add_argument(
+        "-f",
+        "--file",
+        type=Path,
+        help="Read directly from a .vcf or .json file without modifying the database",
+    )
+    parser_export.add_argument(
+        "--years",
+        type=int,
+        default=0,
+        help=(
+            "Number of distinct upcoming years to generate "
+            "(0 creates an infinite recurring event)"
+        ),
+    )
+    parser_export.add_argument(
+        "--alarm-days",
+        type=int,
+        default=1,
+        help="Days before the birthday to trigger a reminder (default: 1)",
+    )
+    parser_export.add_argument(
+        "--alarm-time",
+        type=str,
+        default="09:00",
+        help="Time of day to trigger the reminder (Format: HH:MM, default: 09:00)",
+    )
+    parser_export.add_argument(
+        "--title",
+        dest="title_template",
+        type=str,
+        default="{name}'s Birthday",
+        help=(
+            "Template for the event title. "
+            "Use {name}, {first_name}, {last_name}, {age}, {ordinal_age}, {year}. "
+            "(Note: {age} and {ordinal_age} require --years > 0)"
+        ),
+    )
+    parser_export.add_argument(
+        "--description",
+        dest="description_template",
+        type=str,
+        default="Turns {age} this year!",
+        help="Template for the event description when age is known.",
+    )
+    parser_export.add_argument(
+        "--description-fallback",
+        dest="description_fallback_template",
+        type=str,
+        default="Wish {first_name} a happy birthday!",
+        help="Fallback description template used when age is unknown or --years is 0.",
+    )
+    parser_export.add_argument(
+        "--alarm-description",
+        dest="alarm_description_template",
+        type=str,
+        default="Birthday Reminder: {name}",
+        help="Template for the alarm notification text.",
+    )
+    parser_export.add_argument(
+        "-g", "--group", action="append", help="Filter entries by one or more groups"
+    )
+    parser_export.add_argument(
+        "--match",
+        choices=["any", "all"],
+        default="any",
+        help="Match any selected group or require all of them",
+    )
+    parser_export.add_argument(
+        "--leap-system",
+        choices=["before", "after"],
+        default="before",
+        help="Fallback leap system when reading dynamically from a .vcf file",
+    )
+    parser_export.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print the .ics output to the console instead of writing to a file",
+    )
+    parser_export.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite the output file if it already exists",
     )
 
     return parser
@@ -2031,6 +2268,60 @@ def main():
             )
         else:
             print("All entries are already up to date. Nothing to repair.")
+
+    elif args.command == "export":
+        if args.file:
+            if not args.file.exists():
+                print(f"Error: File '{args.file}' not found.")
+                sys.exit(1)
+            if args.file.suffix.lower() in [".vcf", ".vcard"]:
+                entries = parse_vcards(args.file, args.leap_system)
+            else:
+                entries = load_database(args.file)
+        else:
+            entries = load_database(db_path)
+
+        if not entries:
+            print("No birthdays found to export.")
+            sys.exit(0)
+
+        group_filters = flatten_groups(args.group)
+        if group_filters:
+            entries = [
+                entry
+                for entry in entries
+                if matches_group_filter(entry, group_filters, args.match)
+            ]
+
+        if not entries:
+            print("No birthdays match the specified groups.")
+            sys.exit(0)
+
+        cal = build_ical(
+            entries=entries,
+            years=args.years,
+            alarm_days=args.alarm_days,
+            alarm_time=args.alarm_time,
+            title_tmpl=args.title_template,
+            desc_tmpl=args.description_template,
+            desc_fallback_tmpl=args.description_fallback_template,
+            alarm_desc_tmpl=args.alarm_description_template,
+        )
+
+        ics_bytes = cal.to_ical()
+
+        if args.dry_run:
+            print(ics_bytes.decode("utf-8"))
+        else:
+            out_path = args.output
+            if out_path.exists() and not args.force:
+                if not confirm(f"File '{out_path}' already exists. Overwrite?"):
+                    print("Export cancelled.")
+                    sys.exit(0)
+
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_bytes(ics_bytes)
+            print(f"Successfully exported {len(entries)} contact(s) to '{out_path}'.")
 
     sys.exit(0)
 
