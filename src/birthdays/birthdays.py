@@ -399,6 +399,21 @@ def flatten_groups(raw_groups: Collection[str] | None) -> list[str]:
 
     return flattened
 
+
+def merge_group_lists(
+    existing_groups: list[str], incoming_groups: list[str]
+) -> list[str]:
+    """Merge two normalized group lists while preserving order."""
+    merged: list[str] = []
+    seen: set[str] = set()
+
+    for group in (*existing_groups, *incoming_groups):
+        if group and group not in seen:
+            seen.add(group)
+            merged.append(group)
+
+    return merged
+
 def leapling_safe_date(
     year: int, month: int, day: int, leap_system: Literal["after", "before"] = "before"
 ) -> datetime.date:
@@ -512,6 +527,9 @@ def merge_pair(
     merged_notes = tuple(n for n in (existing_note, incoming_note) if n)
     merged_notes = "; ".join(merged_notes) if merged_notes else None
 
+    existing_groups = flatten_groups(existing.groups)
+    incoming_groups = flatten_groups(incoming.groups)
+
     if interactive:
         if existing_note != incoming_note:
             final_notes = None
@@ -550,6 +568,49 @@ def merge_pair(
         else:
             final_notes = existing_note
 
+        if existing_groups != incoming_groups:
+            final_groups = None
+            if not existing_groups:
+                if confirm(
+                    f"Incoming contact has groups: {', '.join(incoming_groups)!r}. "
+                    "Keep them?",
+                    required=True,
+                ):
+                    final_groups = incoming_groups
+                else:
+                    final_groups = existing_groups
+            elif not incoming_groups:
+                if not confirm(
+                    "Incoming contact has no groups. "
+                    f"Delete existing groups ({', '.join(existing_groups)!r})?",
+                    required=True,
+                ):
+                    final_groups = existing_groups
+                else:
+                    final_groups = []
+            else:
+                merged_groups = merge_group_lists(existing_groups, incoming_groups)
+                options = (
+                    f"Keep existing: {', '.join(existing_groups)}",
+                    f"Keep incoming: {', '.join(incoming_groups)}",
+                    f"Merge both:    {', '.join(merged_groups)}",
+                )
+
+                groups_choice = choose(
+                    options,
+                    prompt="\nGroups differ. How would you like to resolve this?",
+                    required=True,
+                )
+
+                if groups_choice == "1":
+                    final_groups = existing_groups
+                elif groups_choice == "2":
+                    final_groups = incoming_groups
+                else:
+                    final_groups = merged_groups
+        else:
+            final_groups = existing_groups
+
         return BirthdayEntry(
             existing.id,
             incoming.full_name
@@ -567,6 +628,7 @@ def merge_pair(
             or (existing.year != incoming.year and confirm("Change the year?"))
             else existing.year,
             final_notes,
+            final_groups,
             incoming.leap_system
             if existing.leap_system != incoming.leap_system
             and confirm("Change the leap system?")
@@ -579,6 +641,7 @@ def merge_pair(
         incoming.day,
         incoming.year if existing.year is None else existing.year,
         merged_notes,
+        merge_group_lists(existing_groups, incoming_groups),
         incoming.leap_system,
     )
 
