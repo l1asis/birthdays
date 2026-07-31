@@ -414,6 +414,23 @@ def merge_group_lists(
 
     return merged
 
+
+def matches_group_filter(
+    entry: BirthdayEntry, group_filters: list[str], match_mode: Literal["any", "all"]
+) -> bool:
+    """Check whether an entry should survive the active group filter."""
+    if not group_filters:
+        return True
+
+    entry_groups = set(entry.groups)
+    filter_groups = set(group_filters)
+
+    if match_mode == "all":
+        return filter_groups.issubset(entry_groups)
+
+    return bool(entry_groups & filter_groups)
+
+
 def leapling_safe_date(
     year: int, month: int, day: int, leap_system: Literal["after", "before"] = "before"
 ) -> datetime.date:
