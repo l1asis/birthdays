@@ -405,7 +405,7 @@ def parse_vcards(
         raw_text = file.read()
 
     unfolded_text = UNFOLD.sub("", raw_text)
-    unfolded_text = UNFOLD_SOFT.sub("", raw_text)
+    unfolded_text = UNFOLD_SOFT.sub("", unfolded_text)
 
     vcards: list[str] = VCARD.findall(unfolded_text)
     birthdays: List[BirthdayEntry] = []
