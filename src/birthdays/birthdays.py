@@ -541,6 +541,74 @@ def merge_name_parts(
             merged[part_key] = merged_value
 
     return merged
+
+
+def verify_fields(
+    fields: dict[str, str],
+    title: str,
+    extra_callbacks: dict[str, Callable[[dict[str, str]], dict[str, str] | None]]
+    | None = None,
+) -> dict[str, str]:
+    """Interactively review and adjust ordered fields before saving them."""
+    current_fields = {key: normalize_text(value) for key, value in fields.items()}
+    callbacks = extra_callbacks or {}
+
+    def print_fields() -> None:
+        print(title)
+        for index, (label, value) in enumerate(current_fields.items(), start=1):
+            print(f"[{index}] {label}: {value or '<empty>'}")
+        if callbacks:
+            print("Extra actions:")
+            for key, callback in callbacks.items():
+                description = normalize_text(callback.__doc__) or key
+                print(f"[{key}] {description}")
+            extra_keys = ", ".join(f"[{key}]" for key in callbacks)
+            print(f"Enter accepts, '1 4' swaps, 'e 2' edits, or {extra_keys}.")
+        else:
+            print("Enter accepts, '1 4' swaps, or 'e 2' edits.")
+
+    while True:
+        print_fields()
+        user_input = input("-> ").strip()
+
+        if not user_input:
+            return current_fields
+
+        tokens = user_input.split()
+        if len(tokens) == 2 and all(token.isdecimal() for token in tokens):
+            first_index, second_index = (int(token) for token in tokens)
+            keys = list(current_fields)
+            if 1 <= first_index <= len(keys) and 1 <= second_index <= len(keys):
+                first_key = keys[first_index - 1]
+                second_key = keys[second_index - 1]
+                current_fields[first_key], current_fields[second_key] = (
+                    current_fields[second_key],
+                    current_fields[first_key],
+                )
+                continue
+
+        if len(tokens) == 2 and tokens[0].casefold() == "e" and tokens[1].isdecimal():
+            field_index = int(tokens[1])
+            keys = list(current_fields)
+            if 1 <= field_index <= len(keys):
+                field_key = keys[field_index - 1]
+                current_fields[field_key] = normalize_text(
+                    input(f"{field_key}: ").strip()
+                )
+                continue
+
+        callback = callbacks.get(user_input.upper())
+        if callback is not None:
+            returned_fields = callback(current_fields.copy())
+            if returned_fields is not None:
+                current_fields = {
+                    key: normalize_text(value) for key, value in returned_fields.items()
+                }
+            continue
+
+        print("Invalid input. Please choose a valid option.")
+
+
 def normalize_group(group: str) -> str:
     """Normalize a single group label for storage and matching."""
     return group.strip().replace(r"\n", " ").replace(r"\,", ",").casefold()
