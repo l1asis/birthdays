@@ -1703,6 +1703,81 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Overwrite existing name parts with newly parsed ones from the full name",
     )
 
+    parser_export = subparsers.add_parser(
+        "export", help="Export birthdays to an iCalendar (.ics) file"
+    )
+    parser_export.add_argument(
+        "output",
+        type=Path,
+        nargs="?",
+        default=Path("./birthdays.ics"),
+        help="Path to the output .ics file (default: ./birthdays.ics)",
+    )
+    parser_export.add_argument(
+        "-f",
+        "--file",
+        type=Path,
+        help="Read directly from a .vcf or .json file without modifying the database",
+    )
+    parser_export.add_argument(
+        "--years",
+        type=int,
+        default=0,
+        help=(
+            "Number of distinct upcoming years to generate "
+            "(0 creates an infinite recurring event)"
+        ),
+    )
+    parser_export.add_argument(
+        "--alarm-days",
+        type=int,
+        default=1,
+        help="Days before the birthday to trigger a reminder (default: 1)",
+    )
+    parser_export.add_argument(
+        "--alarm-time",
+        type=str,
+        default="09:00",
+        help="Time of day to trigger the reminder (Format: HH:MM, default: 09:00)",
+    )
+    parser_export.add_argument(
+        "--title",
+        dest="title_template",
+        type=str,
+        default="{name}'s Birthday",
+        help=(
+            "Template for the event title. "
+            "Use {name}, {age}, {year}. "
+            "(Note: {age} requires --years > 0)"
+        ),
+    )
+    parser_export.add_argument(
+        "--description",
+        dest="description_template",
+        type=str,
+        default="Turns {age} this year!",
+        help="Template for the event description. (Note: {age} requires --years > 0)",
+    )
+    parser_export.add_argument(
+        "-g", "--group", action="append", help="Filter entries by one or more groups"
+    )
+    parser_export.add_argument(
+        "--match",
+        choices=["any", "all"],
+        default="any",
+        help="Match any selected group or require all of them",
+    )
+    parser_export.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print the .ics output to the console instead of writing to a file",
+    )
+    parser_export.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite the output file if it already exists",
+    )
+
     return parser
 
 
