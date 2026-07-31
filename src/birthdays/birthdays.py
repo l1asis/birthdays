@@ -1465,6 +1465,148 @@ def display_motd(
         print("Run 'birthdays list' to see all.")
 
 
+def build_alarm(alarm_days: int, alarm_time_str: str, alarm_summary: str) -> Any:
+    """Construct a VALARM component for an iCalendar event."""
+    from icalendar import Alarm
+
+    if alarm_days < 0:
+        return None
+
+    try:
+        hour, minute = map(int, alarm_time_str.split(":"))
+    except ValueError:
+        print(f"Warning: Invalid alarm-time format '{alarm_time_str}'. Using 09:00.")
+        hour, minute = 9, 0
+
+    alarm = Alarm()
+    alarm["action"] = "DISPLAY"
+    alarm["description"] = alarm_summary
+
+    trigger_delta = datetime.timedelta(days=-alarm_days, hours=hour, minutes=minute)
+    alarm["trigger"] = trigger_delta
+
+    return alarm
+
+
+def build_ical(
+    entries: List[BirthdayEntry],
+    years: int,
+    alarm_days: int,
+    alarm_time: str,
+    title_tmpl: str,
+    desc_tmpl: str,
+    desc_fallback_tmpl: str,
+    alarm_desc_tmpl: str,
+) -> Any:
+    """Generate an RFC 5545 compliant iCalendar object from birthday entries."""
+    from icalendar import Calendar, Event
+
+    cal = Calendar()
+    cal["prodid"] = "-//l1asis//birthdays//EN"
+    cal["version"] = "2.0"
+
+    today = datetime.date.today()
+
+    def apply_template(
+        tmpl: str, entry: BirthdayEntry, age_val: int | None, year_val: int | None
+    ) -> str:
+        """Safely replace variables without crashing on stray brackets."""
+        if not tmpl:
+            return ""
+
+        res = tmpl.replace("{name}", entry.full_name)
+        res = res.replace(
+            "{first_name}", entry.name_parts.get("first") or entry.full_name
+        )
+        res = res.replace("{last_name}", entry.name_parts.get("last") or "")
+        res = res.replace("{year}", str(year_val) if year_val else "Unknown")
+
+        if age_val is not None:
+            res = res.replace("{age}", str(age_val))
+            res = res.replace("{ordinal_age}", to_ordinal(age_val))
+        else:
+            res = res.replace("{age}", "")
+            res = res.replace("{ordinal_age}", "")
+
+        return res.replace("  ", " ").strip()
+
+    for entry in entries:
+        anchor_date = entry.get_next_occurrence(today)
+
+        if years == 0:
+            event = Event()
+            event["uid"] = entry.id
+            event["dtstamp"] = datetime.datetime.now()
+
+            start_year = entry.year if entry.year is not None else anchor_date.year
+            dtstart = (
+                datetime.date(start_year, entry.month, entry.day)
+                if entry.year
+                else anchor_date
+            )
+            event["dtstart"] = dtstart
+
+            title = apply_template(title_tmpl, entry, None, entry.year)
+            desc = apply_template(desc_fallback_tmpl, entry, None, entry.year)
+            alarm_summary = apply_template(alarm_desc_tmpl, entry, None, entry.year)
+
+            event["summary"] = title
+            if desc:
+                event["description"] = desc
+
+            rrule: dict[str, str | int] = {"freq": "yearly"}
+            if entry.month == 2 and entry.day == 29:
+                if entry.leap_system == "before":
+                    rrule["bymonth"] = 2
+                    rrule["bymonthday"] = -1
+                else:
+                    rrule["byyearday"] = 60
+            event["rrule"] = rrule
+
+            alarm = build_alarm(alarm_days, alarm_time, alarm_summary)
+            if alarm:
+                event.add_component(alarm)
+
+            cal.add_component(event)
+
+        else:
+            current_year = anchor_date.year
+            for i in range(years):
+                target_year = current_year + i
+                exact_date = leapling_safe_date(
+                    target_year, entry.month, entry.day, entry.leap_system
+                )
+
+                event = Event()
+                event["uid"] = f"{entry.id}-{target_year}"
+                event["dtstamp"] = datetime.datetime.now()
+                event["dtstart"] = exact_date
+
+                age_val = (target_year - entry.year) if entry.year is not None else None
+
+                title = apply_template(title_tmpl, entry, age_val, entry.year)
+                alarm_summary = apply_template(
+                    alarm_desc_tmpl, entry, age_val, entry.year
+                )
+
+                if age_val is not None:
+                    desc = apply_template(desc_tmpl, entry, age_val, entry.year)
+                else:
+                    desc = apply_template(desc_fallback_tmpl, entry, None, entry.year)
+
+                event["summary"] = title
+                if desc:
+                    event["description"] = desc
+
+                alarm = build_alarm(alarm_days, alarm_time, alarm_summary)
+                if alarm:
+                    event.add_component(alarm)
+
+                cal.add_component(event)
+
+    return cal
+
+
 # ==========================================
 #               ARGPARSE CLI
 # ==========================================
