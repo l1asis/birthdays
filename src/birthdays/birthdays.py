@@ -420,6 +420,22 @@ def decode_vcard_text(raw_text: str, parameters: str | None) -> str:
     return raw_text.strip()
 
 
+def unescape_vcard_text(value: str) -> str:
+    """Decode vCard escape sequences used in text fields."""
+    return (
+        value.replace(r"\n", " ")
+        .replace(r"\N", " ")
+        .replace(r"\,", ",")
+        .replace(r"\;", ";")
+        .replace(r"\\", "\\")
+        .strip()
+    )
+
+
+def normalize_text(value: str | None) -> str:
+    """Strip empty text values down to a normalized string."""
+    return value.strip() if value and value.strip() else ""
+
 def normalize_group(group: str) -> str:
     """Normalize a single group label for storage and matching."""
     return group.strip().replace(r"\n", " ").replace(r"\,", ",").casefold()
