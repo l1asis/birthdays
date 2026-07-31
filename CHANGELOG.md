@@ -1,3 +1,10 @@
+# [0.5.0](https://github.com/l1asis/birthdays/compare/0.4.1...0.5.0) (2026-07-31)
+
+
+### Features
+
+* ✨ add group tagging for birthday entries ([#19](https://github.com/l1asis/birthdays/issues/19)) ([47f5391](https://github.com/l1asis/birthdays/commit/47f5391b715bf9c01949ff4e523183e23995eee1))
+
 ## [0.4.1](https://github.com/l1asis/birthdays/compare/0.4.0...0.4.1) (2026-07-30)
 
 
