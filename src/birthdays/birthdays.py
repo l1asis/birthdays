@@ -11,7 +11,7 @@ import sys
 import uuid
 from collections import defaultdict
 from collections.abc import Collection
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from operator import attrgetter
 from pathlib import Path
 from typing import Any, List, Literal, Optional, overload
@@ -27,6 +27,9 @@ FULL_NAME = re.compile(r"^FN(;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE
 BIRTHDAY = re.compile(r"^BDAY(?:;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE)
 DATE = re.compile(r"^(\d{4}|--)?-?(0[1-9]|1[0-2])-?(0[1-9]|[12]\d|3[01])$")
 NOTE = re.compile(r"^NOTE(;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE)
+CATEGORIES = re.compile(
+    r"^CATEGORIES(?:;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE
+)
 UNFOLD = re.compile(r"\r?\n[ \t]")  # glues lines that start with a space or tab
 UNFOLD_SOFT = re.compile(r"=\r?\n")  # glues lines that end with an '='
 
@@ -52,6 +55,7 @@ class BirthdayEntry:
     day: int
     year: Optional[int] = None
     notes: Optional[str] = None
+    groups: list[str] = field(default_factory=list[str])
     leap_system: Literal["after", "before"] = "before"
 
     def get_age(self) -> int | None:
@@ -197,6 +201,7 @@ def as_birthday_entry(dictionary: dict[str, Any]) -> BirthdayEntry:
         dictionary["day"],
         dictionary.get("year"),
         dictionary.get("notes"),
+        dictionary.get("groups", []),
         dictionary.get("leap_system", "before"),
     )
 
@@ -279,6 +284,10 @@ def build_motd_command(args: argparse.Namespace) -> str:
         cmd_parts.append(f"--days {args.days}")
     if args.limit != 3:
         cmd_parts.append(f"--limit {args.limit}")
+    for group in flatten_groups(getattr(args, "group", None)):
+        cmd_parts.append(f"--group {group}")
+    if getattr(args, "match", "any") != "any":
+        cmd_parts.append(f"--match {args.match}")
     if getattr(args, "quiet_if_empty", False):
         cmd_parts.append("--quiet-if-empty")
     if getattr(args, "show_date", False):
@@ -375,6 +384,57 @@ def decode_vcard_text(raw_text: str, parameters: str | None) -> str:
     return raw_text.strip()
 
 
+def normalize_group(group: str) -> str:
+    """Normalize a single group label for storage and matching."""
+    return group.strip().replace(r"\n", " ").replace(r"\,", ",").casefold()
+
+
+def flatten_groups(raw_groups: Collection[str] | None) -> list[str]:
+    """Normalize an input collection of groups, splitting comma-separated values."""
+    flattened: list[str] = []
+    seen: set[str] = set()
+
+    for raw_group in raw_groups or []:
+        for group in raw_group.split(","):
+            normalized = normalize_group(group)
+            if normalized and normalized not in seen:
+                seen.add(normalized)
+                flattened.append(normalized)
+
+    return flattened
+
+
+def merge_group_lists(
+    existing_groups: list[str], incoming_groups: list[str]
+) -> list[str]:
+    """Merge two normalized group lists while preserving order."""
+    merged: list[str] = []
+    seen: set[str] = set()
+
+    for group in (*existing_groups, *incoming_groups):
+        if group and group not in seen:
+            seen.add(group)
+            merged.append(group)
+
+    return merged
+
+
+def matches_group_filter(
+    entry: BirthdayEntry, group_filters: list[str], match_mode: Literal["any", "all"]
+) -> bool:
+    """Check whether an entry should survive the active group filter."""
+    if not group_filters:
+        return True
+
+    entry_groups = set(entry.groups)
+    filter_groups = set(group_filters)
+
+    if match_mode == "all":
+        return filter_groups.issubset(entry_groups)
+
+    return bool(entry_groups & filter_groups)
+
+
 def leapling_safe_date(
     year: int, month: int, day: int, leap_system: Literal["after", "before"] = "before"
 ) -> datetime.date:
@@ -403,7 +463,7 @@ def parse_vcards(
         raw_text = file.read()
 
     unfolded_text = UNFOLD.sub("", raw_text)
-    unfolded_text = UNFOLD_SOFT.sub("", raw_text)
+    unfolded_text = UNFOLD_SOFT.sub("", unfolded_text)
 
     vcards: list[str] = VCARD.findall(unfolded_text)
     birthdays: List[BirthdayEntry] = []
@@ -412,6 +472,7 @@ def parse_vcards(
         fn_match = FULL_NAME.search(vcard)
         bday_match = BIRTHDAY.search(vcard)
         note_match = NOTE.search(vcard)
+        categories_match = CATEGORIES.search(vcard)
 
         if fn_match is not None:
             full_name = decode_vcard_text(fn_match.group(2), fn_match.group(1))
@@ -444,6 +505,18 @@ def parse_vcards(
                         )
                         notes = raw_note.replace(r"\n", " ").replace(r"\,", ",")
 
+                    groups: list[str] = []
+                    if categories_match is not None:
+                        raw_categories = decode_vcard_text(
+                            categories_match.group(2), categories_match.group(1)
+                        )
+                        groups = flatten_groups(
+                            [
+                                category.replace(r"\n", " ")
+                                for category in re.split(r"(?<!\\),", raw_categories)
+                            ]
+                        )
+
                     birthdays.append(
                         BirthdayEntry(
                             uuid.uuid4().hex,
@@ -452,6 +525,7 @@ def parse_vcards(
                             day,
                             year,
                             notes,
+                            groups,
                             leap_system,
                         )
                     )
@@ -473,6 +547,9 @@ def merge_pair(
 
     merged_notes = tuple(n for n in (existing_note, incoming_note) if n)
     merged_notes = "; ".join(merged_notes) if merged_notes else None
+
+    existing_groups = flatten_groups(existing.groups)
+    incoming_groups = flatten_groups(incoming.groups)
 
     if interactive:
         if existing_note != incoming_note:
@@ -512,6 +589,49 @@ def merge_pair(
         else:
             final_notes = existing_note
 
+        if existing_groups != incoming_groups:
+            final_groups = None
+            if not existing_groups:
+                if confirm(
+                    f"Incoming contact has groups: {', '.join(incoming_groups)!r}. "
+                    "Keep them?",
+                    required=True,
+                ):
+                    final_groups = incoming_groups
+                else:
+                    final_groups = existing_groups
+            elif not incoming_groups:
+                if not confirm(
+                    "Incoming contact has no groups. "
+                    f"Delete existing groups ({', '.join(existing_groups)!r})?",
+                    required=True,
+                ):
+                    final_groups = existing_groups
+                else:
+                    final_groups = []
+            else:
+                merged_groups = merge_group_lists(existing_groups, incoming_groups)
+                options = (
+                    f"Keep existing: {', '.join(existing_groups)}",
+                    f"Keep incoming: {', '.join(incoming_groups)}",
+                    f"Merge both:    {', '.join(merged_groups)}",
+                )
+
+                groups_choice = choose(
+                    options,
+                    prompt="\nGroups differ. How would you like to resolve this?",
+                    required=True,
+                )
+
+                if groups_choice == "1":
+                    final_groups = existing_groups
+                elif groups_choice == "2":
+                    final_groups = incoming_groups
+                else:
+                    final_groups = merged_groups
+        else:
+            final_groups = existing_groups
+
         return BirthdayEntry(
             existing.id,
             incoming.full_name
@@ -529,6 +649,7 @@ def merge_pair(
             or (existing.year != incoming.year and confirm("Change the year?"))
             else existing.year,
             final_notes,
+            final_groups,
             incoming.leap_system
             if existing.leap_system != incoming.leap_system
             and confirm("Change the leap system?")
@@ -541,6 +662,7 @@ def merge_pair(
         incoming.day,
         incoming.year if existing.year is None else existing.year,
         merged_notes,
+        merge_group_lists(existing_groups, incoming_groups),
         incoming.leap_system,
     )
 
@@ -676,6 +798,8 @@ def find_entry(db: List[BirthdayEntry], identifier: str) -> BirthdayEntry | None
         elif ident_lower in entry.full_name.casefold():
             matches.append(entry)
         elif entry.notes and ident_lower in entry.notes.casefold():
+            matches.append(entry)
+        elif ident_lower in {group.casefold() for group in entry.groups}:
             matches.append(entry)
 
     if not matches:
@@ -882,7 +1006,7 @@ def display_birthdays(
     entries: List[BirthdayEntry],
     sort_by: Literal["name", "date", "upcoming", "recent", "age"] = "upcoming",
     sort_order: Literal["asc", "desc"] = "desc",
-    view_style: Literal["simple", "table", "calendar"] = "simple",
+    view_style: Literal["simple", "table", "calendar", "groups"] = "simple",
     use_emoji: bool = True,
     should_sort: bool = True,
     show_header_date: bool = False,
@@ -893,7 +1017,64 @@ def display_birthdays(
     if should_sort:
         entries = sort_entries(entries, sort_by, sort_order)
 
-    if view_style == "simple":
+    if view_style == "groups":
+        if show_header_date:
+            date_str = today.strftime("%A, %b %d")
+            print(f"Birthdays for {date_str}{' 🎂' if use_emoji else ''}")
+        else:
+            print(f"Birthdays{' 🎂' if use_emoji else ''}")
+
+        grouped_entries: dict[str, list[BirthdayEntry]] = defaultdict(list)
+        for entry in entries:
+            primary_group = entry.groups[0] if entry.groups else "ungrouped"
+            grouped_entries[primary_group].append(entry)
+
+        ordered_groups = sorted(
+            grouped_entries,
+            key=lambda group: (group == "ungrouped", group.casefold()),
+        )
+
+        for group_name in ordered_groups:
+            print(f"\n{group_name}")
+            for entry in grouped_entries[group_name]:
+                age = entry.get_age()
+                next_in = entry.next_occurrence_in(today)
+                prev_in = entry.prev_occurrence_in(today)
+
+                emoji = date_to_emoji(entry.year, entry.month, entry.day)
+                group_suffix = (
+                    f" (also in: {', '.join(entry.groups[1:])})"
+                    if len(entry.groups) > 1
+                    else ""
+                )
+                print(f"{emoji if use_emoji else '->'}  {entry}{group_suffix}")
+
+                if entry.is_today():
+                    age = f"{to_ordinal(age)} " if age is not None else ""
+                    print(f"    Has a {age}birthday today{' 🥳' if use_emoji else '!'}")
+                else:
+                    age = f"{age} y.o., " if age is not None else ""
+                    months = tuple(
+                        f" {delta.months} month{'s' if delta.months > 1 else ''}"
+                        if delta.months > 0
+                        else ""
+                        for delta in (next_in, prev_in)
+                    )
+                    days = tuple(
+                        (
+                            f"{' and' if delta.months else ''} "
+                            f"{delta.days} day{'s' if delta.days > 1 else ''}"
+                        )
+                        if delta.days > 0
+                        else ""
+                        for delta in (next_in, prev_in)
+                    )
+                    if sort_by != "recent":
+                        print(f"    {age}Next in{months[0]}{days[0]}")
+                    elif sort_by == "recent":
+                        print(f"    {age}Previous:{months[1]}{days[1]} ago")
+
+    elif view_style == "simple":
         if show_header_date:
             date_str = today.strftime("%A, %b %d")
             print(f"Birthdays for {date_str}{' 🎂' if use_emoji else ''}")
@@ -941,9 +1122,19 @@ def display_motd(
     quiet_if_empty: bool = False,
     use_emoji: bool = True,
     show_header_date: bool = False,
+    groups: list[str] | None = None,
+    match: Literal["any", "all"] = "any",
 ) -> None:
     """Print a minimal summary of upcoming birthdays."""
     today = datetime.date.today()
+
+    group_filters = flatten_groups(groups)
+    if group_filters:
+        entries = [
+            entry
+            for entry in entries
+            if matches_group_filter(entry, group_filters, match)
+        ]
 
     upcoming = [
         entry
@@ -1034,9 +1225,21 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     parser_list.add_argument(
         "--view",
-        choices=["simple", "table", "calendar"],
+        choices=["simple", "table", "calendar", "groups"],
         default="simple",
         help="Visual presentation style",
+    )
+    parser_list.add_argument(
+        "-g",
+        "--group",
+        action="append",
+        help="Filter entries by one or more groups",
+    )
+    parser_list.add_argument(
+        "--match",
+        choices=["any", "all"],
+        default="any",
+        help="Match any selected group or require all of them",
     )
     parser_list.add_argument(
         "-f",
@@ -1056,6 +1259,12 @@ def setup_parser() -> argparse.ArgumentParser:
     parser_add.add_argument("date", type=str, help="Birthday (YYYY-MM-DD | MM-DD)")
     parser_add.add_argument("--note", type=str, help="Optional note to attach")
     parser_add.add_argument(
+        "-g",
+        "--group",
+        action="append",
+        help="Assign one or more groups to the new entry",
+    )
+    parser_add.add_argument(
         "--leap-system",
         dest="leap_system",
         choices=["before", "after"],
@@ -1070,6 +1279,12 @@ def setup_parser() -> argparse.ArgumentParser:
         "--date", type=str, help="Update the birthday (YYYY-MM-DD | MM-DD)"
     )
     parser_edit.add_argument("--note", type=str, help="Update the attached note")
+    parser_edit.add_argument(
+        "-g",
+        "--group",
+        action="append",
+        help="Assign one or more groups to the entry",
+    )
     parser_edit.add_argument(
         "--leap-system",
         dest="leap_system",
@@ -1097,6 +1312,12 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Skip interactive collision prompts and auto-merge safe entries",
     )
     parser_import.add_argument(
+        "-g",
+        "--group",
+        action="append",
+        help="Assign imported contacts to one or more groups",
+    )
+    parser_import.add_argument(
         "--leap-system",
         dest="leap_system",
         choices=["before", "after"],
@@ -1117,6 +1338,18 @@ def setup_parser() -> argparse.ArgumentParser:
         "--rc-file",
         type=Path,
         help="Path to a custom shell config file (overrides automatic detection)",
+    )
+    parser_motd.add_argument(
+        "-g",
+        "--group",
+        action="append",
+        help="Filter entries by one or more groups",
+    )
+    parser_motd.add_argument(
+        "--match",
+        choices=["any", "all"],
+        default="any",
+        help="Match any selected group or require all of them",
     )
     parser_motd.add_argument(
         "--days", type=int, default=7, help="Days ahead to check for birthdays"
@@ -1170,6 +1403,18 @@ def main():
             print("No birthdays found.")
             return
 
+        group_filters = flatten_groups(args.group)
+        if group_filters:
+            entries = [
+                entry
+                for entry in entries
+                if matches_group_filter(entry, group_filters, args.match)
+            ]
+
+        if not entries:
+            print("No birthdays found.")
+            return
+
         display_birthdays(
             entries,
             sort_by=args.sort,
@@ -1199,6 +1444,7 @@ def main():
                 day=day,
                 year=year,
                 notes=args.note,
+                groups=flatten_groups(args.group),
                 leap_system=args.leap_system,
             )
         except ValueError as e:
@@ -1232,6 +1478,9 @@ def main():
         if args.note is not None:
             target.notes = args.note if args.note.strip() else None
 
+        if args.group is not None:
+            target.groups = flatten_groups(args.group)
+
         if args.leap_system:
             target.leap_system = args.leap_system
 
@@ -1264,6 +1513,22 @@ def main():
             incoming = parse_vcards(args.file, args.leap_system)
         else:
             incoming = load_database(args.file)
+
+        imported_groups = flatten_groups(args.group)
+        if imported_groups:
+            incoming = [
+                BirthdayEntry(
+                    entry.id,
+                    entry.full_name,
+                    entry.month,
+                    entry.day,
+                    entry.year,
+                    entry.notes,
+                    merge_group_lists(entry.groups, imported_groups),
+                    entry.leap_system,
+                )
+                for entry in incoming
+            ]
 
         print(f"Loaded {len(incoming)} contacts from {args.file.name}.")
 
@@ -1309,6 +1574,8 @@ def main():
                 quiet_if_empty=args.quiet_if_empty,
                 use_emoji=use_emoji,
                 show_header_date=args.show_date,
+                groups=args.group,
+                match=args.match,
             )
 
     sys.exit(0)
