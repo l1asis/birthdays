@@ -11,7 +11,7 @@ import sys
 import uuid
 from collections import defaultdict
 from collections.abc import Collection
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from operator import attrgetter
 from pathlib import Path
 from typing import Any, List, Literal, Optional, overload
@@ -52,6 +52,7 @@ class BirthdayEntry:
     day: int
     year: Optional[int] = None
     notes: Optional[str] = None
+    groups: list[str] = field(default_factory=list[str])
     leap_system: Literal["after", "before"] = "before"
 
     def get_age(self) -> int | None:
