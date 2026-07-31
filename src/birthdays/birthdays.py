@@ -778,6 +778,8 @@ def find_entry(db: List[BirthdayEntry], identifier: str) -> BirthdayEntry | None
             matches.append(entry)
         elif entry.notes and ident_lower in entry.notes.casefold():
             matches.append(entry)
+        elif ident_lower in {group.casefold() for group in entry.groups}:
+            matches.append(entry)
 
     if not matches:
         db_names = [e.full_name for e in db]
