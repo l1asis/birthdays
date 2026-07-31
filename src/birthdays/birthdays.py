@@ -1747,8 +1747,8 @@ def setup_parser() -> argparse.ArgumentParser:
         default="{name}'s Birthday",
         help=(
             "Template for the event title. "
-            "Use {name}, {age}, {year}. "
-            "(Note: {age} requires --years > 0)"
+            "Use {name}, {first_name}, {last_name}, {age}, {ordinal_age}, {year}. "
+            "(Note: {age} and {ordinal_age} require --years > 0)"
         ),
     )
     parser_export.add_argument(
@@ -1756,7 +1756,21 @@ def setup_parser() -> argparse.ArgumentParser:
         dest="description_template",
         type=str,
         default="Turns {age} this year!",
-        help="Template for the event description. (Note: {age} requires --years > 0)",
+        help="Template for the event description when age is known.",
+    )
+    parser_export.add_argument(
+        "--description-fallback",
+        dest="description_fallback_template",
+        type=str,
+        default="Wish {first_name} a happy birthday!",
+        help="Fallback description template used when age is unknown or --years is 0.",
+    )
+    parser_export.add_argument(
+        "--alarm-description",
+        dest="alarm_description_template",
+        type=str,
+        default="Birthday Reminder: {name}",
+        help="Template for the alarm notification text.",
     )
     parser_export.add_argument(
         "-g", "--group", action="append", help="Filter entries by one or more groups"
@@ -1766,6 +1780,12 @@ def setup_parser() -> argparse.ArgumentParser:
         choices=["any", "all"],
         default="any",
         help="Match any selected group or require all of them",
+    )
+    parser_export.add_argument(
+        "--leap-system",
+        choices=["before", "after"],
+        default="before",
+        help="Fallback leap system when reading dynamically from a .vcf file",
     )
     parser_export.add_argument(
         "--dry-run",
