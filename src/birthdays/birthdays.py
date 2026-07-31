@@ -1210,7 +1210,18 @@ def to_ordinal(number: int) -> str:
 
 def sort_entries(
     entries: List[BirthdayEntry],
-    sort_by: Literal["name", "date", "upcoming", "recent", "age"] = "upcoming",
+    sort_by: Literal[
+        "name",
+        "date",
+        "upcoming",
+        "recent",
+        "age",
+        "prefix",
+        "first_name",
+        "middle_name",
+        "last_name",
+        "suffix",
+    ] = "upcoming",
     sort_order: Literal["asc", "desc"] = "desc",
 ) -> List[BirthdayEntry]:
     """Sort birthday entries by criteria and order."""
@@ -1254,13 +1265,30 @@ def sort_entries(
             ),
             reverse=sort_order == "desc",
         )
+    elif sort_by in NAME_SORT_TO_PART:
+        part_key = NAME_SORT_TO_PART[sort_by]
+        entries.sort(
+            key=lambda entry: entry.name_parts.get(part_key, "").casefold(),
+            reverse=sort_order == "desc",
+        )
 
     return entries
 
 
 def display_birthdays(
     entries: List[BirthdayEntry],
-    sort_by: Literal["name", "date", "upcoming", "recent", "age"] = "upcoming",
+    sort_by: Literal[
+        "name",
+        "date",
+        "upcoming",
+        "recent",
+        "age",
+        "prefix",
+        "first_name",
+        "middle_name",
+        "last_name",
+        "suffix",
+    ] = "upcoming",
     sort_order: Literal["asc", "desc"] = "desc",
     view_style: Literal["simple", "table", "calendar", "groups"] = "simple",
     use_emoji: bool = True,
@@ -1272,6 +1300,9 @@ def display_birthdays(
 
     if should_sort:
         entries = sort_entries(entries, sort_by, sort_order)
+
+    if sort_by in NAME_SORT_LABELS:
+        print(f"Sorted by {NAME_SORT_LABELS[sort_by]}")
 
     if view_style == "groups":
         if show_header_date:
