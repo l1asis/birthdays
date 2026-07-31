@@ -1,3 +1,10 @@
+## [0.7.1](https://github.com/l1asis/birthdays/compare/0.7.0...0.7.1) (2026-07-31)
+
+
+### Bug Fixes
+
+* 🐛 correct broken value assignments for .vcf ([859ed61](https://github.com/l1asis/birthdays/commit/859ed61dd487a47bd9a6b5e5b5d6a2e9b9fe46b6))
+
 # [0.7.0](https://github.com/l1asis/birthdays/compare/0.6.0...0.7.0) (2026-07-31)
 
 
