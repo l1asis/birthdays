@@ -695,65 +695,84 @@ def parse_vcards(
 
     for vcard in vcards:
         fn_match = FULL_NAME.search(vcard)
+        n_match = NAME.search(vcard)
         bday_match = BIRTHDAY.search(vcard)
         note_match = NOTE.search(vcard)
         categories_match = CATEGORIES.search(vcard)
 
+        if fn_match is None and n_match is None:
+            continue
+
+        full_name = ""
         if fn_match is not None:
             full_name = decode_vcard_text(fn_match.group(2), fn_match.group(1))
 
-            if bday_match is not None:
-                date_str = bday_match.group(1)
-                year = month = day = None
+        name_parts: dict[str, str] = {}
+        if n_match is not None:
+            raw_name = decode_vcard_text(n_match.group(2), n_match.group(1))
+            name_parts = parse_vcard_name_parts(raw_name)
+            if not full_name:
+                full_name = compose_full_name(name_parts)
 
-                try:
-                    date = datetime.date.fromisoformat(date_str)
-                    year, month, day = date.year, date.month, date.day
+        if not full_name:
+            full_name = compose_full_name(name_parts)
 
-                except ValueError:
-                    date_match = DATE.match(date_str)
+        if not name_parts and full_name:
+            name_parts = parse_name_parts(full_name)
 
-                    if date_match is not None:
-                        year, month, day = (
-                            int(year_match)
-                            if (year_match := date_match.group(1)).isdecimal()
-                            else None,
-                            int(date_match.group(2)),
-                            int(date_match.group(3)),
-                        )
+        if bday_match is not None:
+            date_str = bday_match.group(1)
+            year = month = day = None
 
-                if month is not None and day is not None:
-                    notes = None
-                    if note_match is not None:
-                        raw_note = decode_vcard_text(
-                            note_match.group(2), note_match.group(1)
-                        )
-                        notes = raw_note.replace(r"\n", " ").replace(r"\,", ",")
+            try:
+                date = datetime.date.fromisoformat(date_str)
+                year, month, day = date.year, date.month, date.day
 
-                    groups: list[str] = []
-                    if categories_match is not None:
-                        raw_categories = decode_vcard_text(
-                            categories_match.group(2), categories_match.group(1)
-                        )
-                        groups = flatten_groups(
-                            [
-                                category.replace(r"\n", " ")
-                                for category in re.split(r"(?<!\\),", raw_categories)
-                            ]
-                        )
+            except ValueError:
+                date_match = DATE.match(date_str)
 
-                    birthdays.append(
-                        BirthdayEntry(
-                            uuid.uuid4().hex,
-                            full_name,
-                            month,
-                            day,
-                            year,
-                            notes,
-                            groups,
-                            leap_system,
-                        )
+                if date_match is not None:
+                    year, month, day = (
+                        int(year_match)
+                        if (year_match := date_match.group(1)).isdecimal()
+                        else None,
+                        int(date_match.group(2)),
+                        int(date_match.group(3)),
                     )
+
+            if month is not None and day is not None:
+                notes = None
+                if note_match is not None:
+                    raw_note = decode_vcard_text(
+                        note_match.group(2), note_match.group(1)
+                    )
+                    notes = unescape_vcard_text(raw_note)
+
+                groups: list[str] = []
+                if categories_match is not None:
+                    raw_categories = decode_vcard_text(
+                        categories_match.group(2), categories_match.group(1)
+                    )
+                    groups = flatten_groups(
+                        [
+                            category.replace(r"\n", " ")
+                            for category in re.split(r"(?<!\\),", raw_categories)
+                        ]
+                    )
+
+                birthdays.append(
+                    BirthdayEntry(
+                        uuid.uuid4().hex,
+                        full_name,
+                        month,
+                        day,
+                        year,
+                        notes,
+                        groups,
+                        leap_system,
+                        name_parts,
+                    )
+                )
 
     return birthdays
 
