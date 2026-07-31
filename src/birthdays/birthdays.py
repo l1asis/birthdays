@@ -84,6 +84,7 @@ class BirthdayEntry:
     notes: Optional[str] = None
     groups: list[str] = field(default_factory=list[str])
     leap_system: Literal["after", "before"] = "before"
+    name_parts: dict[str, str] = field(default_factory=dict[str, str])
 
     def get_age(self) -> int | None:
         """Return the person's current age, or None if the year is unknown."""
@@ -162,7 +163,10 @@ class BirthdayEntry:
             f"{self.month}, "
             f"{self.day}, "
             f"{self.year}, "
-            f"{repr(self.notes) if self.notes else 'None'})"
+            f"{repr(self.notes) if self.notes else 'None'}, "
+            f"{repr(self.groups)}, "
+            f"{repr(self.leap_system)}, "
+            f"{repr(self.name_parts) if self.name_parts else '{}'})"
         )
 
     def __lt__(self, other: "BirthdayEntry | datetime.date") -> bool:
@@ -219,8 +223,12 @@ def get_database_path() -> Path:
     return dir_path / "birthdays.json"
 
 
-def as_birthday_entry(dictionary: dict[str, Any]) -> BirthdayEntry:
+def as_birthday_entry(dictionary: dict[str, Any]) -> Any:
     """Read a JSON dictionary and safely convert it into BirthdayEntry."""
+
+    if "id" not in dictionary:
+        return dictionary
+
     return BirthdayEntry(
         dictionary["id"],
         dictionary["full_name"],
@@ -230,6 +238,7 @@ def as_birthday_entry(dictionary: dict[str, Any]) -> BirthdayEntry:
         dictionary.get("notes"),
         dictionary.get("groups", []),
         dictionary.get("leap_system", "before"),
+        dictionary.get("name_parts", {}),
     )
 
 
