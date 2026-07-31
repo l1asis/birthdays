@@ -1403,6 +1403,18 @@ def main():
             print("No birthdays found.")
             return
 
+        group_filters = flatten_groups(args.group)
+        if group_filters:
+            entries = [
+                entry
+                for entry in entries
+                if matches_group_filter(entry, group_filters, args.match)
+            ]
+
+        if not entries:
+            print("No birthdays found.")
+            return
+
         display_birthdays(
             entries,
             sort_by=args.sort,
@@ -1432,6 +1444,7 @@ def main():
                 day=day,
                 year=year,
                 notes=args.note,
+                groups=flatten_groups(args.group),
                 leap_system=args.leap_system,
             )
         except ValueError as e:
@@ -1465,6 +1478,9 @@ def main():
         if args.note is not None:
             target.notes = args.note if args.note.strip() else None
 
+        if args.group is not None:
+            target.groups = flatten_groups(args.group)
+
         if args.leap_system:
             target.leap_system = args.leap_system
 
@@ -1497,6 +1513,22 @@ def main():
             incoming = parse_vcards(args.file, args.leap_system)
         else:
             incoming = load_database(args.file)
+
+        imported_groups = flatten_groups(args.group)
+        if imported_groups:
+            incoming = [
+                BirthdayEntry(
+                    entry.id,
+                    entry.full_name,
+                    entry.month,
+                    entry.day,
+                    entry.year,
+                    entry.notes,
+                    merge_group_lists(entry.groups, imported_groups),
+                    entry.leap_system,
+                )
+                for entry in incoming
+            ]
 
         print(f"Loaded {len(incoming)} contacts from {args.file.name}.")
 
@@ -1542,6 +1574,8 @@ def main():
                 quiet_if_empty=args.quiet_if_empty,
                 use_emoji=use_emoji,
                 show_header_date=args.show_date,
+                groups=args.group,
+                match=args.match,
             )
 
     sys.exit(0)
