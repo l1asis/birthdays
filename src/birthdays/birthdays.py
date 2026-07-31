@@ -14,9 +14,10 @@ from collections.abc import Collection
 from dataclasses import asdict, dataclass, field
 from operator import attrgetter
 from pathlib import Path
-from typing import Any, List, Literal, Optional, overload
+from typing import Any, Callable, List, Literal, Optional, overload
 
 from dateutil.relativedelta import relativedelta
+from nameparser import HumanName
 from platformdirs import user_cache_path, user_data_path
 
 from . import __about__, __version__
@@ -24,14 +25,40 @@ from .emojis import date_to_emoji, should_use_emoji
 
 VCARD = re.compile(r"BEGIN:VCARD.*?END:VCARD", flags=re.DOTALL | re.IGNORECASE)
 FULL_NAME = re.compile(r"^FN(;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE)
+NAME = re.compile(r"^N(;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE)
 BIRTHDAY = re.compile(r"^BDAY(?:;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE)
 DATE = re.compile(r"^(\d{4}|--)?-?(0[1-9]|1[0-2])-?(0[1-9]|[12]\d|3[01])$")
 NOTE = re.compile(r"^NOTE(;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE)
 CATEGORIES = re.compile(
     r"^CATEGORIES(?:;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE
 )
+VCARD_NAME_SPLIT = re.compile(r"(?<!\\);")
 UNFOLD = re.compile(r"\r?\n[ \t]")  # glues lines that start with a space or tab
 UNFOLD_SOFT = re.compile(r"=\r?\n")  # glues lines that end with an '='
+
+NAME_PART_FIELDS = ("prefix", "first", "middle", "last", "suffix")
+NAME_PART_LABELS = {
+    "prefix": "Prefix",
+    "first": "First",
+    "middle": "Middle",
+    "last": "Last",
+    "suffix": "Suffix",
+}
+NAME_SORT_LABELS = {
+    "prefix": "Prefix",
+    "first_name": "First Name",
+    "middle_name": "Middle Name",
+    "last_name": "Last Name",
+    "suffix": "Suffix",
+}
+NAME_SORT_TO_PART = {
+    "prefix": "prefix",
+    "first_name": "first",
+    "middle_name": "middle",
+    "last_name": "last",
+    "suffix": "suffix",
+}
+
 
 MOTD_MARKER_START = "# >>> birthdays motd >>>"
 MOTD_MARKER_END = "# <<< birthdays motd <<<"
