@@ -1,3 +1,10 @@
+# [0.6.0](https://github.com/l1asis/birthdays/compare/0.5.0...0.6.0) (2026-07-31)
+
+
+### Features
+
+* ✨ parse standard `N` vcard properties ([#20](https://github.com/l1asis/birthdays/issues/20)) ([ed99d40](https://github.com/l1asis/birthdays/commit/ed99d400e4d42da32b9300cea3fdf90a74e8aa3e))
+
 # [0.5.0](https://github.com/l1asis/birthdays/compare/0.4.1...0.5.0) (2026-07-31)
 
 
