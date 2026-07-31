@@ -1816,15 +1816,22 @@ def main():
         day = int(date_match.group(3))
 
         try:
+            name_parts = parse_name_parts(args.name)
+            if has_explicit_name_parts(args):
+                name_parts.update(build_name_parts_from_args(args))
+            else:
+                name_parts = verify_parsed_name(args.name, name_parts)
+
             new_entry = BirthdayEntry(
                 id=uuid.uuid4().hex,
-                full_name=args.name,
+                full_name=compose_full_name(name_parts) or args.name,
                 month=month,
                 day=day,
                 year=year,
                 notes=args.note,
                 groups=flatten_groups(args.group),
                 leap_system=args.leap_system,
+                name_parts=name_parts,
             )
         except ValueError as e:
             print(f"Error creating entry: {e}")
@@ -1840,8 +1847,27 @@ def main():
         if not target:
             sys.exit(1)
 
+        target_name_parts = compact_name_parts(target.name_parts)
+        if not target_name_parts:
+            target_name_parts = parse_name_parts(target.full_name)
+
         if args.name:
-            target.full_name = args.name
+            parsed_name_parts = parse_name_parts(args.name)
+            if has_explicit_name_parts(args):
+                parsed_name_parts.update(build_name_parts_from_args(args))
+            else:
+                parsed_name_parts = verify_parsed_name(args.name, parsed_name_parts)
+            target.name_parts = parsed_name_parts
+            target.full_name = compose_full_name(parsed_name_parts) or args.name
+
+        explicit_parts = build_name_parts_from_args(args)
+        if explicit_parts:
+            target_name_parts.update(explicit_parts)
+            target.name_parts = target_name_parts
+            target.full_name = compose_full_name(target_name_parts) or target.full_name
+        elif args.name is None and target_name_parts:
+            target.name_parts = target_name_parts
+            target.full_name = compose_full_name(target_name_parts) or target.full_name
 
         if args.date:
             date_match = DATE.match(args.date)
@@ -1905,6 +1931,7 @@ def main():
                     entry.notes,
                     merge_group_lists(entry.groups, imported_groups),
                     entry.leap_system,
+                    entry.name_parts,
                 )
                 for entry in incoming
             ]
@@ -1956,6 +1983,42 @@ def main():
                 groups=args.group,
                 match=args.match,
             )
+
+    elif args.command == "repair":
+        if not args.names:
+            print("Please specify a repair action, e.g., 'birthdays repair --names'")
+            sys.exit(1)
+
+        db = load_database(db_path)
+        updated_count = 0
+
+        print("Scanning database for legacy entries...")
+
+        for entry in db:
+            existing_parts = compact_name_parts(entry.name_parts)
+            parsed_parts = parse_name_parts(entry.full_name)
+
+            if args.force:
+                merged_parts = parsed_parts
+            else:
+                merged_parts = dict(existing_parts)
+                for part_key, part_value in parsed_parts.items():
+                    if not merged_parts.get(part_key):
+                        merged_parts[part_key] = part_value
+
+            if merged_parts != existing_parts:
+                entry.name_parts = merged_parts
+                updated_count += 1
+
+        if updated_count > 0:
+            save_database(db, db_path)
+            mode = "overwritten" if args.force else "backfilled"
+            print(
+                f"Successfully parsed and {mode} name parts "
+                f"for {updated_count} entries."
+            )
+        else:
+            print("All entries are already up to date. Nothing to repair.")
 
     sys.exit(0)
 
