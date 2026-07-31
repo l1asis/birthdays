@@ -794,6 +794,19 @@ def merge_pair(
 
     existing_groups = flatten_groups(existing.groups)
     incoming_groups = flatten_groups(incoming.groups)
+    existing_name_parts = compact_name_parts(existing.name_parts)
+    incoming_name_parts = compact_name_parts(incoming.name_parts)
+    merged_name_parts = merge_name_parts(
+        existing_name_parts,
+        incoming_name_parts,
+        interactive=interactive,
+    )
+    merged_full_name = prefer_text_value(
+        existing.full_name,
+        incoming.full_name,
+        field_label="Full name",
+        interactive=interactive,
+    )
 
     if interactive:
         if existing_note != incoming_note:
@@ -878,10 +891,7 @@ def merge_pair(
 
         return BirthdayEntry(
             existing.id,
-            incoming.full_name
-            if existing.full_name != incoming.full_name
-            and confirm("Change the full name?")
-            else existing.full_name,
+            merged_full_name,
             incoming.month
             if existing.month != incoming.month and confirm("Change the month?")
             else existing.month,
@@ -898,16 +908,18 @@ def merge_pair(
             if existing.leap_system != incoming.leap_system
             and confirm("Change the leap system?")
             else existing.leap_system,
+            merged_name_parts,
         )
     return BirthdayEntry(
         existing.id,
-        incoming.full_name,
+        merged_full_name,
         incoming.month,
         incoming.day,
         incoming.year if existing.year is None else existing.year,
         merged_notes,
         merge_group_lists(existing_groups, incoming_groups),
         incoming.leap_system,
+        merged_name_parts,
     )
 
 
