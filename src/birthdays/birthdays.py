@@ -1709,6 +1709,63 @@ def main():
 
     db_path = get_database_path()
 
+    label_to_part = {label: part for part, label in NAME_PART_LABELS.items()}
+
+    def name_parts_to_display(name_parts: dict[str, str]) -> dict[str, str]:
+        return {
+            NAME_PART_LABELS[key]: name_parts.get(key, "") for key in NAME_PART_FIELDS
+        }
+
+    def display_to_name_parts(fields: dict[str, str]) -> dict[str, str]:
+        return compact_name_parts(
+            {
+                label_to_part[label]: value
+                for label, value in fields.items()
+                if label in label_to_part
+            }
+        )
+
+    def build_name_parts_from_args(namespace: argparse.Namespace) -> dict[str, str]:
+        return compact_name_parts(
+            {
+                part_key: getattr(namespace, arg_name)
+                for arg_name, part_key in NAME_SORT_TO_PART.items()
+                if getattr(namespace, arg_name, None) is not None
+            }
+        )
+
+    def has_explicit_name_parts(namespace: argparse.Namespace) -> bool:
+        return any(
+            getattr(namespace, arg_name, None) is not None
+            for arg_name in NAME_SORT_TO_PART
+        )
+
+    def manual_name_parts(current_fields: dict[str, str]) -> dict[str, str]:
+        """Manually enter all fields."""
+        return verify_fields(
+            {
+                label: current_fields.get(label, "")
+                for label in NAME_PART_LABELS.values()
+            },
+            "Review the parsed name components:",
+        )
+
+    def rerun_nameparser(current_fields: dict[str, str]) -> dict[str, str]:
+        """Re-type full name completely."""
+        return name_parts_to_display(
+            parse_name_parts(compose_full_name(display_to_name_parts(current_fields)))
+        )
+
+    def verify_parsed_name(
+        full_name: str, parsed_parts: dict[str, str]
+    ) -> dict[str, str]:
+        verified_parts = verify_fields(
+            name_parts_to_display(parsed_parts),
+            f"Review parsed name components for {full_name!r}:",
+            extra_callbacks={"M": manual_name_parts, "R": rerun_nameparser},
+        )
+        return display_to_name_parts(verified_parts)
+
     if args.command == "list":
         if args.file:
             if not args.file.exists():
