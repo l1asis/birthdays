@@ -1213,7 +1213,18 @@ def setup_parser() -> argparse.ArgumentParser:
     parser_list = subparsers.add_parser("list", help="Display saved birthdays")
     parser_list.add_argument(
         "--sort",
-        choices=["name", "date", "upcoming", "recent", "age"],
+        choices=[
+            "name",
+            "date",
+            "upcoming",
+            "recent",
+            "age",
+            "prefix",
+            "first_name",
+            "middle_name",
+            "last_name",
+            "suffix",
+        ],
         default="upcoming",
         help="How to sort the output",
     )
@@ -1258,6 +1269,11 @@ def setup_parser() -> argparse.ArgumentParser:
     parser_add.add_argument("name", type=str, help="Full name of the person")
     parser_add.add_argument("date", type=str, help="Birthday (YYYY-MM-DD | MM-DD)")
     parser_add.add_argument("--note", type=str, help="Optional note to attach")
+    parser_add.add_argument("--prefix", type=str, help="Name prefix")
+    parser_add.add_argument("--first-name", type=str, help="First name")
+    parser_add.add_argument("--middle-name", type=str, help="Middle name")
+    parser_add.add_argument("--last-name", type=str, help="Last name")
+    parser_add.add_argument("--suffix", type=str, help="Name suffix")
     parser_add.add_argument(
         "-g",
         "--group",
@@ -1279,6 +1295,11 @@ def setup_parser() -> argparse.ArgumentParser:
         "--date", type=str, help="Update the birthday (YYYY-MM-DD | MM-DD)"
     )
     parser_edit.add_argument("--note", type=str, help="Update the attached note")
+    parser_edit.add_argument("--prefix", type=str, help="Update the name prefix")
+    parser_edit.add_argument("--first-name", type=str, help="Update the first name")
+    parser_edit.add_argument("--middle-name", type=str, help="Update the middle name")
+    parser_edit.add_argument("--last-name", type=str, help="Update the last name")
+    parser_edit.add_argument("--suffix", type=str, help="Update the name suffix")
     parser_edit.add_argument(
         "-g",
         "--group",
@@ -1367,6 +1388,20 @@ def setup_parser() -> argparse.ArgumentParser:
         "--once-per-day",
         action="store_true",
         help="Only display the MOTD once per calendar day",
+    )
+
+    parser_repair = subparsers.add_parser(
+        "repair", help="Run maintenance to fix or backfill missing database fields"
+    )
+    parser_repair.add_argument(
+        "--names",
+        action="store_true",
+        help="Parse and fill missing name components for legacy database entries",
+    )
+    parser_repair.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing name parts with newly parsed ones from the full name",
     )
 
     return parser
