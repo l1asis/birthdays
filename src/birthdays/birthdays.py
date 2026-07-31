@@ -1479,11 +1479,11 @@ def build_alarm(alarm_days: int, alarm_time_str: str, alarm_summary: str) -> Any
         hour, minute = 9, 0
 
     alarm = Alarm()
-    alarm["action"] = "DISPLAY"
-    alarm["description"] = alarm_summary
+    alarm.add("action", "DISPLAY")  # type: ignore
+    alarm.add("description", alarm_summary)  # type: ignore
 
     trigger_delta = datetime.timedelta(days=-alarm_days, hours=hour, minutes=minute)
-    alarm["trigger"] = trigger_delta
+    alarm.add("trigger", trigger_delta)  # type: ignore
 
     return alarm
 
@@ -1502,8 +1502,8 @@ def build_ical(
     from icalendar import Calendar, Event
 
     cal = Calendar()
-    cal["prodid"] = "-//l1asis//birthdays//EN"
-    cal["version"] = "2.0"
+    cal.add("prodid", "-//l1asis//birthdays//EN")  # type: ignore
+    cal.add("version", "2.0")  # type: ignore
 
     today = datetime.date.today()
 
@@ -1535,8 +1535,8 @@ def build_ical(
 
         if years == 0:
             event = Event()
-            event["uid"] = entry.id
-            event["dtstamp"] = datetime.datetime.now()
+            event.add("uid", entry.id)  # type: ignore
+            event.add("dtstamp", datetime.datetime.now())  # type: ignore
 
             start_year = entry.year if entry.year is not None else anchor_date.year
             dtstart = (
@@ -1544,15 +1544,15 @@ def build_ical(
                 if entry.year
                 else anchor_date
             )
-            event["dtstart"] = dtstart
+            event.add("dtstart", dtstart)  # type: ignore
 
             title = apply_template(title_tmpl, entry, None, entry.year)
             desc = apply_template(desc_fallback_tmpl, entry, None, entry.year)
             alarm_summary = apply_template(alarm_desc_tmpl, entry, None, entry.year)
 
-            event["summary"] = title
+            event.add("summary", title)  # type: ignore
             if desc:
-                event["description"] = desc
+                event.add("description", desc)  # type: ignore
 
             rrule: dict[str, str | int] = {"freq": "yearly"}
             if entry.month == 2 and entry.day == 29:
@@ -1561,7 +1561,7 @@ def build_ical(
                     rrule["bymonthday"] = -1
                 else:
                     rrule["byyearday"] = 60
-            event["rrule"] = rrule
+            event.add("rrule", rrule)  # type: ignore
 
             alarm = build_alarm(alarm_days, alarm_time, alarm_summary)
             if alarm:
@@ -1578,9 +1578,9 @@ def build_ical(
                 )
 
                 event = Event()
-                event["uid"] = f"{entry.id}-{target_year}"
-                event["dtstamp"] = datetime.datetime.now()
-                event["dtstart"] = exact_date
+                event.add("uid", f"{entry.id}-{target_year}")  # type: ignore
+                event.add("dtstamp", datetime.datetime.now())  # type: ignore
+                event.add("dtstart", exact_date)  # type: ignore
 
                 age_val = (target_year - entry.year) if entry.year is not None else None
 
@@ -1594,9 +1594,9 @@ def build_ical(
                 else:
                     desc = apply_template(desc_fallback_tmpl, entry, None, entry.year)
 
-                event["summary"] = title
+                event.add("summary", title)  # type: ignore
                 if desc:
-                    event["description"] = desc
+                    event.add("description", desc)  # type: ignore
 
                 alarm = build_alarm(alarm_days, alarm_time, alarm_summary)
                 if alarm:
