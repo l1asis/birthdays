@@ -21,6 +21,7 @@
 - **Organizational Groups:** Assign contacts to custom tags (like `family`, `friends`, or `coworkers`) to keep your database organized and filter terminal outputs.
 - **Festive UI:** Every date is assigned a unique, deterministic emoji to keep the terminal vibe bright and colorful *(can be disabled via a global flag or environment variables)*
 - **Shell MOTD:** Automatically display a summary of upcoming birthdays when opening a new terminal session, complete with safe, automated hooks for `.bashrc`, `.zshrc`, `config.fish`, and `PowerShell` profiles
+- **iCalendar Export:** Generate standard `.ics` files to import into your favorite calendar app, complete with customizable reminders, dynamic text templates, and proper leap year handling.
 
 ## Requirements
 
@@ -112,8 +113,7 @@ birthdays import ./contacts.vcf
 
 ### Shell MOTD (Message of the Day)
 
-> [!TIP]
-> You can automatically display a minimal summary of upcoming birthdays every time you open a new terminal session.
+You can automatically display a minimal summary of upcoming birthdays every time you open a new terminal session.
 
 **Display the MOTD manually:**
 
@@ -155,6 +155,35 @@ birthdays repair --names
 
 ```bash
 birthdays repair --names --force
+```
+
+Here are the additions to include in your README to document the new export feature.
+
+Add this bullet point to the `## Features` section:
+
+```md
+- **iCalendar Export:** Generate standard `.ics` files to import into your favorite calendar app, complete with customizable reminders, dynamic text templates, and proper leap year handling.
+
+```
+
+### Exporting to iCalendar (.ics)
+
+**Basic static export (creates infinite recurring events):**
+
+```bash
+birthdays export ./my_birthdays.ics
+```
+
+**Advanced spanned export (generates distinct events for the next 10 years to support dynamic ages):**
+
+```bash
+birthdays export ./my_birthdays.ics --years 10
+```
+
+**Customize reminders, templates, and filter by groups:**
+
+```bash
+birthdays export ./family.ics -g family --alarm-days 2 --alarm-time "10:00" --title "{first_name}'s {ordinal_age} Birthday!"
 ```
 
 ## Configurations
