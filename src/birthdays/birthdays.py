@@ -198,6 +198,7 @@ def as_birthday_entry(dictionary: dict[str, Any]) -> BirthdayEntry:
         dictionary["day"],
         dictionary.get("year"),
         dictionary.get("notes"),
+        dictionary.get("groups", []),
         dictionary.get("leap_system", "before"),
     )
 
