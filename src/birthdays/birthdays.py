@@ -436,6 +436,50 @@ def normalize_text(value: str | None) -> str:
     """Strip empty text values down to a normalized string."""
     return value.strip() if value and value.strip() else ""
 
+
+def compact_name_parts(name_parts: dict[str, str]) -> dict[str, str]:
+    """Remove blank name components while preserving key order."""
+    return {
+        key: normalize_text(value)
+        for key, value in name_parts.items()
+        if normalize_text(value)
+    }
+
+
+def parse_name_parts(full_name: str) -> dict[str, str]:
+    """Parse a full display name into normalized components once at ingestion."""
+    human_name = HumanName(full_name)
+    return compact_name_parts(
+        {
+            "prefix": human_name.title,
+            "first": human_name.first,
+            "middle": human_name.middle,
+            "last": human_name.last,
+            "suffix": human_name.suffix,
+        }
+    )
+
+
+def parse_vcard_name_parts(raw_name: str) -> dict[str, str]:
+    """Parse the vCard N property into name components."""
+    parts = [unescape_vcard_text(part) for part in VCARD_NAME_SPLIT.split(raw_name)]
+    parts.extend([""] * (5 - len(parts)))
+    family, given, additional, prefix, suffix = parts[:5]
+    return compact_name_parts(
+        {
+            "prefix": prefix,
+            "first": given,
+            "middle": additional,
+            "last": family,
+            "suffix": suffix,
+        }
+    )
+
+
+def compose_full_name(name_parts: dict[str, str]) -> str:
+    """Rebuild a display name from ordered name components."""
+    ordered_parts = [normalize_text(name_parts.get(key)) for key in NAME_PART_FIELDS]
+    return " ".join(part for part in ordered_parts if part)
 def normalize_group(group: str) -> str:
     """Normalize a single group label for storage and matching."""
     return group.strip().replace(r"\n", " ").replace(r"\,", ",").casefold()
