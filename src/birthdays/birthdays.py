@@ -1122,9 +1122,19 @@ def display_motd(
     quiet_if_empty: bool = False,
     use_emoji: bool = True,
     show_header_date: bool = False,
+    groups: list[str] | None = None,
+    match: Literal["any", "all"] = "any",
 ) -> None:
     """Print a minimal summary of upcoming birthdays."""
     today = datetime.date.today()
+
+    group_filters = flatten_groups(groups)
+    if group_filters:
+        entries = [
+            entry
+            for entry in entries
+            if matches_group_filter(entry, group_filters, match)
+        ]
 
     upcoming = [
         entry
