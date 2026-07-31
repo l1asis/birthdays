@@ -27,6 +27,9 @@ FULL_NAME = re.compile(r"^FN(;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE
 BIRTHDAY = re.compile(r"^BDAY(?:;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE)
 DATE = re.compile(r"^(\d{4}|--)?-?(0[1-9]|1[0-2])-?(0[1-9]|[12]\d|3[01])$")
 NOTE = re.compile(r"^NOTE(;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE)
+CATEGORIES = re.compile(
+    r"^CATEGORIES(?:;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE
+)
 UNFOLD = re.compile(r"\r?\n[ \t]")  # glues lines that start with a space or tab
 UNFOLD_SOFT = re.compile(r"=\r?\n")  # glues lines that end with an '='
 
@@ -377,6 +380,25 @@ def decode_vcard_text(raw_text: str, parameters: str | None) -> str:
     return raw_text.strip()
 
 
+def normalize_group(group: str) -> str:
+    """Normalize a single group label for storage and matching."""
+    return group.strip().replace(r"\n", " ").replace(r"\,", ",").casefold()
+
+
+def flatten_groups(raw_groups: Collection[str] | None) -> list[str]:
+    """Normalize an input collection of groups, splitting comma-separated values."""
+    flattened: list[str] = []
+    seen: set[str] = set()
+
+    for raw_group in raw_groups or []:
+        for group in raw_group.split(","):
+            normalized = normalize_group(group)
+            if normalized and normalized not in seen:
+                seen.add(normalized)
+                flattened.append(normalized)
+
+    return flattened
+
 def leapling_safe_date(
     year: int, month: int, day: int, leap_system: Literal["after", "before"] = "before"
 ) -> datetime.date:
@@ -414,6 +436,7 @@ def parse_vcards(
         fn_match = FULL_NAME.search(vcard)
         bday_match = BIRTHDAY.search(vcard)
         note_match = NOTE.search(vcard)
+        categories_match = CATEGORIES.search(vcard)
 
         if fn_match is not None:
             full_name = decode_vcard_text(fn_match.group(2), fn_match.group(1))
@@ -446,6 +469,18 @@ def parse_vcards(
                         )
                         notes = raw_note.replace(r"\n", " ").replace(r"\,", ",")
 
+                    groups: list[str] = []
+                    if categories_match is not None:
+                        raw_categories = decode_vcard_text(
+                            categories_match.group(2), categories_match.group(1)
+                        )
+                        groups = flatten_groups(
+                            [
+                                category.replace(r"\n", " ")
+                                for category in re.split(r"(?<!\\),", raw_categories)
+                            ]
+                        )
+
                     birthdays.append(
                         BirthdayEntry(
                             uuid.uuid4().hex,
@@ -454,6 +489,7 @@ def parse_vcards(
                             day,
                             year,
                             notes,
+                            groups,
                             leap_system,
                         )
                     )
