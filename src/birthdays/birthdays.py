@@ -2269,6 +2269,60 @@ def main():
         else:
             print("All entries are already up to date. Nothing to repair.")
 
+    elif args.command == "export":
+        if args.file:
+            if not args.file.exists():
+                print(f"Error: File '{args.file}' not found.")
+                sys.exit(1)
+            if args.file.suffix.lower() in [".vcf", ".vcard"]:
+                entries = parse_vcards(args.file, args.leap_system)
+            else:
+                entries = load_database(args.file)
+        else:
+            entries = load_database(db_path)
+
+        if not entries:
+            print("No birthdays found to export.")
+            sys.exit(0)
+
+        group_filters = flatten_groups(args.group)
+        if group_filters:
+            entries = [
+                entry
+                for entry in entries
+                if matches_group_filter(entry, group_filters, args.match)
+            ]
+
+        if not entries:
+            print("No birthdays match the specified groups.")
+            sys.exit(0)
+
+        cal = build_ical(
+            entries=entries,
+            years=args.years,
+            alarm_days=args.alarm_days,
+            alarm_time=args.alarm_time,
+            title_tmpl=args.title_template,
+            desc_tmpl=args.description_template,
+            desc_fallback_tmpl=args.description_fallback_template,
+            alarm_desc_tmpl=args.alarm_description_template,
+        )
+
+        ics_bytes = cal.to_ical()
+
+        if args.dry_run:
+            print(ics_bytes.decode("utf-8"))
+        else:
+            out_path = args.output
+            if out_path.exists() and not args.force:
+                if not confirm(f"File '{out_path}' already exists. Overwrite?"):
+                    print("Export cancelled.")
+                    sys.exit(0)
+
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_bytes(ics_bytes)
+            print(f"Successfully exported {len(entries)} contact(s) to '{out_path}'.")
+
     sys.exit(0)
 
 
