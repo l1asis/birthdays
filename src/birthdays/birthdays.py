@@ -284,6 +284,10 @@ def build_motd_command(args: argparse.Namespace) -> str:
         cmd_parts.append(f"--days {args.days}")
     if args.limit != 3:
         cmd_parts.append(f"--limit {args.limit}")
+    for group in flatten_groups(getattr(args, "group", None)):
+        cmd_parts.append(f"--group {group}")
+    if getattr(args, "match", "any") != "any":
+        cmd_parts.append(f"--match {args.match}")
     if getattr(args, "quiet_if_empty", False):
         cmd_parts.append("--quiet-if-empty")
     if getattr(args, "show_date", False):
@@ -1154,9 +1158,21 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     parser_list.add_argument(
         "--view",
-        choices=["simple", "table", "calendar"],
+        choices=["simple", "table", "calendar", "groups"],
         default="simple",
         help="Visual presentation style",
+    )
+    parser_list.add_argument(
+        "-g",
+        "--group",
+        action="append",
+        help="Filter entries by one or more groups",
+    )
+    parser_list.add_argument(
+        "--match",
+        choices=["any", "all"],
+        default="any",
+        help="Match any selected group or require all of them",
     )
     parser_list.add_argument(
         "-f",
@@ -1176,6 +1192,12 @@ def setup_parser() -> argparse.ArgumentParser:
     parser_add.add_argument("date", type=str, help="Birthday (YYYY-MM-DD | MM-DD)")
     parser_add.add_argument("--note", type=str, help="Optional note to attach")
     parser_add.add_argument(
+        "-g",
+        "--group",
+        action="append",
+        help="Assign one or more groups to the new entry",
+    )
+    parser_add.add_argument(
         "--leap-system",
         dest="leap_system",
         choices=["before", "after"],
@@ -1190,6 +1212,12 @@ def setup_parser() -> argparse.ArgumentParser:
         "--date", type=str, help="Update the birthday (YYYY-MM-DD | MM-DD)"
     )
     parser_edit.add_argument("--note", type=str, help="Update the attached note")
+    parser_edit.add_argument(
+        "-g",
+        "--group",
+        action="append",
+        help="Assign one or more groups to the entry",
+    )
     parser_edit.add_argument(
         "--leap-system",
         dest="leap_system",
@@ -1217,6 +1245,12 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Skip interactive collision prompts and auto-merge safe entries",
     )
     parser_import.add_argument(
+        "-g",
+        "--group",
+        action="append",
+        help="Assign imported contacts to one or more groups",
+    )
+    parser_import.add_argument(
         "--leap-system",
         dest="leap_system",
         choices=["before", "after"],
@@ -1237,6 +1271,18 @@ def setup_parser() -> argparse.ArgumentParser:
         "--rc-file",
         type=Path,
         help="Path to a custom shell config file (overrides automatic detection)",
+    )
+    parser_motd.add_argument(
+        "-g",
+        "--group",
+        action="append",
+        help="Filter entries by one or more groups",
+    )
+    parser_motd.add_argument(
+        "--match",
+        choices=["any", "all"],
+        default="any",
+        help="Match any selected group or require all of them",
     )
     parser_motd.add_argument(
         "--days", type=int, default=7, help="Days ahead to check for birthdays"
