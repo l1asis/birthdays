@@ -14,9 +14,10 @@ from collections.abc import Collection
 from dataclasses import asdict, dataclass, field
 from operator import attrgetter
 from pathlib import Path
-from typing import Any, List, Literal, Optional, overload
+from typing import Any, Callable, List, Literal, Optional, overload
 
 from dateutil.relativedelta import relativedelta
+from nameparser import HumanName
 from platformdirs import user_cache_path, user_data_path
 
 from . import __about__, __version__
@@ -24,14 +25,40 @@ from .emojis import date_to_emoji, should_use_emoji
 
 VCARD = re.compile(r"BEGIN:VCARD.*?END:VCARD", flags=re.DOTALL | re.IGNORECASE)
 FULL_NAME = re.compile(r"^FN(;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE)
+NAME = re.compile(r"^N(;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE)
 BIRTHDAY = re.compile(r"^BDAY(?:;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE)
 DATE = re.compile(r"^(\d{4}|--)?-?(0[1-9]|1[0-2])-?(0[1-9]|[12]\d|3[01])$")
 NOTE = re.compile(r"^NOTE(;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE)
 CATEGORIES = re.compile(
     r"^CATEGORIES(?:;[^:]*)?:(.*)$", flags=re.MULTILINE | re.IGNORECASE
 )
+VCARD_NAME_SPLIT = re.compile(r"(?<!\\);")
 UNFOLD = re.compile(r"\r?\n[ \t]")  # glues lines that start with a space or tab
 UNFOLD_SOFT = re.compile(r"=\r?\n")  # glues lines that end with an '='
+
+NAME_PART_FIELDS = ("prefix", "first", "middle", "last", "suffix")
+NAME_PART_LABELS = {
+    "prefix": "Prefix",
+    "first": "First",
+    "middle": "Middle",
+    "last": "Last",
+    "suffix": "Suffix",
+}
+NAME_SORT_LABELS = {
+    "prefix": "Prefix",
+    "first_name": "First Name",
+    "middle_name": "Middle Name",
+    "last_name": "Last Name",
+    "suffix": "Suffix",
+}
+NAME_SORT_TO_PART = {
+    "prefix": "prefix",
+    "first_name": "first",
+    "middle_name": "middle",
+    "last_name": "last",
+    "suffix": "suffix",
+}
+
 
 MOTD_MARKER_START = "# >>> birthdays motd >>>"
 MOTD_MARKER_END = "# <<< birthdays motd <<<"
@@ -57,6 +84,7 @@ class BirthdayEntry:
     notes: Optional[str] = None
     groups: list[str] = field(default_factory=list[str])
     leap_system: Literal["after", "before"] = "before"
+    name_parts: dict[str, str] = field(default_factory=dict[str, str])
 
     def get_age(self) -> int | None:
         """Return the person's current age, or None if the year is unknown."""
@@ -135,7 +163,10 @@ class BirthdayEntry:
             f"{self.month}, "
             f"{self.day}, "
             f"{self.year}, "
-            f"{repr(self.notes) if self.notes else 'None'})"
+            f"{repr(self.notes) if self.notes else 'None'}, "
+            f"{repr(self.groups)}, "
+            f"{repr(self.leap_system)}, "
+            f"{repr(self.name_parts) if self.name_parts else '{}'})"
         )
 
     def __lt__(self, other: "BirthdayEntry | datetime.date") -> bool:
@@ -192,8 +223,12 @@ def get_database_path() -> Path:
     return dir_path / "birthdays.json"
 
 
-def as_birthday_entry(dictionary: dict[str, Any]) -> BirthdayEntry:
+def as_birthday_entry(dictionary: dict[str, Any]) -> Any:
     """Read a JSON dictionary and safely convert it into BirthdayEntry."""
+
+    if "id" not in dictionary:
+        return dictionary
+
     return BirthdayEntry(
         dictionary["id"],
         dictionary["full_name"],
@@ -203,6 +238,7 @@ def as_birthday_entry(dictionary: dict[str, Any]) -> BirthdayEntry:
         dictionary.get("notes"),
         dictionary.get("groups", []),
         dictionary.get("leap_system", "before"),
+        dictionary.get("name_parts", {}),
     )
 
 
@@ -384,6 +420,195 @@ def decode_vcard_text(raw_text: str, parameters: str | None) -> str:
     return raw_text.strip()
 
 
+def unescape_vcard_text(value: str) -> str:
+    """Decode vCard escape sequences used in text fields."""
+    return (
+        value.replace(r"\n", " ")
+        .replace(r"\N", " ")
+        .replace(r"\,", ",")
+        .replace(r"\;", ";")
+        .replace(r"\\", "\\")
+        .strip()
+    )
+
+
+def normalize_text(value: str | None) -> str:
+    """Strip empty text values down to a normalized string."""
+    return value.strip() if value and value.strip() else ""
+
+
+def compact_name_parts(name_parts: dict[str, str]) -> dict[str, str]:
+    """Remove blank name components while preserving key order."""
+    return {
+        key: normalize_text(value)
+        for key, value in name_parts.items()
+        if normalize_text(value)
+    }
+
+
+def parse_name_parts(full_name: str) -> dict[str, str]:
+    """Parse a full display name into normalized components once at ingestion."""
+    human_name = HumanName(full_name)
+    return compact_name_parts(
+        {
+            "prefix": human_name.title,
+            "first": human_name.first,
+            "middle": human_name.middle,
+            "last": human_name.last,
+            "suffix": human_name.suffix,
+        }
+    )
+
+
+def parse_vcard_name_parts(raw_name: str) -> dict[str, str]:
+    """Parse the vCard N property into name components."""
+    parts = [unescape_vcard_text(part) for part in VCARD_NAME_SPLIT.split(raw_name)]
+    parts.extend([""] * (5 - len(parts)))
+    family, given, additional, prefix, suffix = parts[:5]
+    return compact_name_parts(
+        {
+            "prefix": prefix,
+            "first": given,
+            "middle": additional,
+            "last": family,
+            "suffix": suffix,
+        }
+    )
+
+
+def compose_full_name(name_parts: dict[str, str]) -> str:
+    """Rebuild a display name from ordered name components."""
+    ordered_parts = [normalize_text(name_parts.get(key)) for key in NAME_PART_FIELDS]
+    return " ".join(part for part in ordered_parts if part)
+
+
+def prefer_text_value(
+    existing_value: str | None,
+    incoming_value: str | None,
+    *,
+    field_label: str,
+    interactive: bool,
+) -> str:
+    """Prefer the most complete non-empty string and only prompt on true conflicts."""
+    existing_text = normalize_text(existing_value)
+    incoming_text = normalize_text(incoming_value)
+
+    if not existing_text:
+        return incoming_text
+    if not incoming_text:
+        return existing_text
+    if existing_text.casefold() == incoming_text.casefold():
+        return existing_text
+
+    if len(existing_text) != len(incoming_text):
+        preferred = (
+            incoming_text if len(incoming_text) > len(existing_text) else existing_text
+        )
+        if not interactive:
+            return preferred
+        if existing_text in incoming_text or incoming_text in existing_text:
+            return preferred
+    else:
+        preferred = incoming_text
+        if not interactive:
+            return preferred
+
+    if confirm(
+        f"{field_label} differs. Keep incoming value {incoming_text!r}?",
+        required=True,
+    ):
+        return incoming_text
+    return existing_text
+
+
+def merge_name_parts(
+    existing_parts: dict[str, str],
+    incoming_parts: dict[str, str],
+    *,
+    interactive: bool,
+) -> dict[str, str]:
+    """Merge name components while preferring populated values."""
+    merged: dict[str, str] = {}
+
+    for part_key in NAME_PART_FIELDS:
+        merged_value = prefer_text_value(
+            existing_parts.get(part_key),
+            incoming_parts.get(part_key),
+            field_label=NAME_PART_LABELS[part_key],
+            interactive=interactive,
+        )
+        if merged_value:
+            merged[part_key] = merged_value
+
+    return merged
+
+
+def verify_fields(
+    fields: dict[str, str],
+    title: str,
+    extra_callbacks: dict[str, Callable[[dict[str, str]], dict[str, str] | None]]
+    | None = None,
+) -> dict[str, str]:
+    """Interactively review and adjust ordered fields before saving them."""
+    current_fields = {key: normalize_text(value) for key, value in fields.items()}
+    callbacks = extra_callbacks or {}
+
+    def print_fields() -> None:
+        print(title)
+        for index, (label, value) in enumerate(current_fields.items(), start=1):
+            print(f"[{index}] {label}: {value or '<empty>'}")
+        if callbacks:
+            print("Extra actions:")
+            for key, callback in callbacks.items():
+                description = normalize_text(callback.__doc__) or key
+                print(f"[{key}] {description}")
+            extra_keys = ", ".join(f"[{key}]" for key in callbacks)
+            print(f"Enter accepts, '1 4' swaps, 'e 2' edits, or {extra_keys}.")
+        else:
+            print("Enter accepts, '1 4' swaps, or 'e 2' edits.")
+
+    while True:
+        print_fields()
+        user_input = input("-> ").strip()
+
+        if not user_input:
+            return current_fields
+
+        tokens = user_input.split()
+        if len(tokens) == 2 and all(token.isdecimal() for token in tokens):
+            first_index, second_index = (int(token) for token in tokens)
+            keys = list(current_fields)
+            if 1 <= first_index <= len(keys) and 1 <= second_index <= len(keys):
+                first_key = keys[first_index - 1]
+                second_key = keys[second_index - 1]
+                current_fields[first_key], current_fields[second_key] = (
+                    current_fields[second_key],
+                    current_fields[first_key],
+                )
+                continue
+
+        if len(tokens) == 2 and tokens[0].casefold() == "e" and tokens[1].isdecimal():
+            field_index = int(tokens[1])
+            keys = list(current_fields)
+            if 1 <= field_index <= len(keys):
+                field_key = keys[field_index - 1]
+                current_fields[field_key] = normalize_text(
+                    input(f"{field_key}: ").strip()
+                )
+                continue
+
+        callback = callbacks.get(user_input.upper())
+        if callback is not None:
+            returned_fields = callback(current_fields.copy())
+            if returned_fields is not None:
+                current_fields = {
+                    key: normalize_text(value) for key, value in returned_fields.items()
+                }
+            continue
+
+        print("Invalid input. Please choose a valid option.")
+
+
 def normalize_group(group: str) -> str:
     """Normalize a single group label for storage and matching."""
     return group.strip().replace(r"\n", " ").replace(r"\,", ",").casefold()
@@ -470,65 +695,84 @@ def parse_vcards(
 
     for vcard in vcards:
         fn_match = FULL_NAME.search(vcard)
+        n_match = NAME.search(vcard)
         bday_match = BIRTHDAY.search(vcard)
         note_match = NOTE.search(vcard)
         categories_match = CATEGORIES.search(vcard)
 
+        if fn_match is None and n_match is None:
+            continue
+
+        full_name = ""
         if fn_match is not None:
             full_name = decode_vcard_text(fn_match.group(2), fn_match.group(1))
 
-            if bday_match is not None:
-                date_str = bday_match.group(1)
-                year = month = day = None
+        name_parts: dict[str, str] = {}
+        if n_match is not None:
+            raw_name = decode_vcard_text(n_match.group(2), n_match.group(1))
+            name_parts = parse_vcard_name_parts(raw_name)
+            if not full_name:
+                full_name = compose_full_name(name_parts)
 
-                try:
-                    date = datetime.date.fromisoformat(date_str)
-                    year, month, day = date.year, date.month, date.day
+        if not full_name:
+            full_name = compose_full_name(name_parts)
 
-                except ValueError:
-                    date_match = DATE.match(date_str)
+        if not name_parts and full_name:
+            name_parts = parse_name_parts(full_name)
 
-                    if date_match is not None:
-                        year, month, day = (
-                            int(year_match)
-                            if (year_match := date_match.group(1)).isdecimal()
-                            else None,
-                            int(date_match.group(2)),
-                            int(date_match.group(3)),
-                        )
+        if bday_match is not None:
+            date_str = bday_match.group(1)
+            year = month = day = None
 
-                if month is not None and day is not None:
-                    notes = None
-                    if note_match is not None:
-                        raw_note = decode_vcard_text(
-                            note_match.group(2), note_match.group(1)
-                        )
-                        notes = raw_note.replace(r"\n", " ").replace(r"\,", ",")
+            try:
+                date = datetime.date.fromisoformat(date_str)
+                year, month, day = date.year, date.month, date.day
 
-                    groups: list[str] = []
-                    if categories_match is not None:
-                        raw_categories = decode_vcard_text(
-                            categories_match.group(2), categories_match.group(1)
-                        )
-                        groups = flatten_groups(
-                            [
-                                category.replace(r"\n", " ")
-                                for category in re.split(r"(?<!\\),", raw_categories)
-                            ]
-                        )
+            except ValueError:
+                date_match = DATE.match(date_str)
 
-                    birthdays.append(
-                        BirthdayEntry(
-                            uuid.uuid4().hex,
-                            full_name,
-                            month,
-                            day,
-                            year,
-                            notes,
-                            groups,
-                            leap_system,
-                        )
+                if date_match is not None:
+                    year, month, day = (
+                        int(year_match)
+                        if (year_match := date_match.group(1)).isdecimal()
+                        else None,
+                        int(date_match.group(2)),
+                        int(date_match.group(3)),
                     )
+
+            if month is not None and day is not None:
+                notes = None
+                if note_match is not None:
+                    raw_note = decode_vcard_text(
+                        note_match.group(2), note_match.group(1)
+                    )
+                    notes = unescape_vcard_text(raw_note)
+
+                groups: list[str] = []
+                if categories_match is not None:
+                    raw_categories = decode_vcard_text(
+                        categories_match.group(2), categories_match.group(1)
+                    )
+                    groups = flatten_groups(
+                        [
+                            category.replace(r"\n", " ")
+                            for category in re.split(r"(?<!\\),", raw_categories)
+                        ]
+                    )
+
+                birthdays.append(
+                    BirthdayEntry(
+                        uuid.uuid4().hex,
+                        full_name,
+                        month,
+                        day,
+                        year,
+                        notes,
+                        groups,
+                        leap_system,
+                        name_parts,
+                    )
+                )
 
     return birthdays
 
@@ -550,6 +794,19 @@ def merge_pair(
 
     existing_groups = flatten_groups(existing.groups)
     incoming_groups = flatten_groups(incoming.groups)
+    existing_name_parts = compact_name_parts(existing.name_parts)
+    incoming_name_parts = compact_name_parts(incoming.name_parts)
+    merged_name_parts = merge_name_parts(
+        existing_name_parts,
+        incoming_name_parts,
+        interactive=interactive,
+    )
+    merged_full_name = prefer_text_value(
+        existing.full_name,
+        incoming.full_name,
+        field_label="Full name",
+        interactive=interactive,
+    )
 
     if interactive:
         if existing_note != incoming_note:
@@ -634,10 +891,7 @@ def merge_pair(
 
         return BirthdayEntry(
             existing.id,
-            incoming.full_name
-            if existing.full_name != incoming.full_name
-            and confirm("Change the full name?")
-            else existing.full_name,
+            merged_full_name,
             incoming.month
             if existing.month != incoming.month and confirm("Change the month?")
             else existing.month,
@@ -654,16 +908,18 @@ def merge_pair(
             if existing.leap_system != incoming.leap_system
             and confirm("Change the leap system?")
             else existing.leap_system,
+            merged_name_parts,
         )
     return BirthdayEntry(
         existing.id,
-        incoming.full_name,
+        merged_full_name,
         incoming.month,
         incoming.day,
         incoming.year if existing.year is None else existing.year,
         merged_notes,
         merge_group_lists(existing_groups, incoming_groups),
         incoming.leap_system,
+        merged_name_parts,
     )
 
 
@@ -954,7 +1210,18 @@ def to_ordinal(number: int) -> str:
 
 def sort_entries(
     entries: List[BirthdayEntry],
-    sort_by: Literal["name", "date", "upcoming", "recent", "age"] = "upcoming",
+    sort_by: Literal[
+        "name",
+        "date",
+        "upcoming",
+        "recent",
+        "age",
+        "prefix",
+        "first_name",
+        "middle_name",
+        "last_name",
+        "suffix",
+    ] = "upcoming",
     sort_order: Literal["asc", "desc"] = "desc",
 ) -> List[BirthdayEntry]:
     """Sort birthday entries by criteria and order."""
@@ -998,13 +1265,30 @@ def sort_entries(
             ),
             reverse=sort_order == "desc",
         )
+    elif sort_by in NAME_SORT_TO_PART:
+        part_key = NAME_SORT_TO_PART[sort_by]
+        entries.sort(
+            key=lambda entry: entry.name_parts.get(part_key, "").casefold(),
+            reverse=sort_order == "desc",
+        )
 
     return entries
 
 
 def display_birthdays(
     entries: List[BirthdayEntry],
-    sort_by: Literal["name", "date", "upcoming", "recent", "age"] = "upcoming",
+    sort_by: Literal[
+        "name",
+        "date",
+        "upcoming",
+        "recent",
+        "age",
+        "prefix",
+        "first_name",
+        "middle_name",
+        "last_name",
+        "suffix",
+    ] = "upcoming",
     sort_order: Literal["asc", "desc"] = "desc",
     view_style: Literal["simple", "table", "calendar", "groups"] = "simple",
     use_emoji: bool = True,
@@ -1016,6 +1300,9 @@ def display_birthdays(
 
     if should_sort:
         entries = sort_entries(entries, sort_by, sort_order)
+
+    if sort_by in NAME_SORT_LABELS:
+        print(f"Sorted by {NAME_SORT_LABELS[sort_by]}")
 
     if view_style == "groups":
         if show_header_date:
@@ -1213,7 +1500,18 @@ def setup_parser() -> argparse.ArgumentParser:
     parser_list = subparsers.add_parser("list", help="Display saved birthdays")
     parser_list.add_argument(
         "--sort",
-        choices=["name", "date", "upcoming", "recent", "age"],
+        choices=[
+            "name",
+            "date",
+            "upcoming",
+            "recent",
+            "age",
+            "prefix",
+            "first_name",
+            "middle_name",
+            "last_name",
+            "suffix",
+        ],
         default="upcoming",
         help="How to sort the output",
     )
@@ -1258,6 +1556,17 @@ def setup_parser() -> argparse.ArgumentParser:
     parser_add.add_argument("name", type=str, help="Full name of the person")
     parser_add.add_argument("date", type=str, help="Birthday (YYYY-MM-DD | MM-DD)")
     parser_add.add_argument("--note", type=str, help="Optional note to attach")
+    parser_add.add_argument("--prefix", type=str, help="Name prefix")
+    parser_add.add_argument("--first-name", type=str, help="First name")
+    parser_add.add_argument("--middle-name", type=str, help="Middle name")
+    parser_add.add_argument("--last-name", type=str, help="Last name")
+    parser_add.add_argument("--suffix", type=str, help="Name suffix")
+    parser_add.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="Skip interactive name verification and accept parsed parts",
+    )
     parser_add.add_argument(
         "-g",
         "--group",
@@ -1279,6 +1588,17 @@ def setup_parser() -> argparse.ArgumentParser:
         "--date", type=str, help="Update the birthday (YYYY-MM-DD | MM-DD)"
     )
     parser_edit.add_argument("--note", type=str, help="Update the attached note")
+    parser_edit.add_argument("--prefix", type=str, help="Update the name prefix")
+    parser_edit.add_argument("--first-name", type=str, help="Update the first name")
+    parser_edit.add_argument("--middle-name", type=str, help="Update the middle name")
+    parser_edit.add_argument("--last-name", type=str, help="Update the last name")
+    parser_edit.add_argument("--suffix", type=str, help="Update the name suffix")
+    parser_edit.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="Skip interactive name verification and accept parsed parts",
+    )
     parser_edit.add_argument(
         "-g",
         "--group",
@@ -1369,6 +1689,20 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Only display the MOTD once per calendar day",
     )
 
+    parser_repair = subparsers.add_parser(
+        "repair", help="Run maintenance to fix or backfill missing database fields"
+    )
+    parser_repair.add_argument(
+        "--names",
+        action="store_true",
+        help="Parse and fill missing name components for legacy database entries",
+    )
+    parser_repair.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing name parts with newly parsed ones from the full name",
+    )
+
     return parser
 
 
@@ -1386,6 +1720,63 @@ def main():
         parser.error("the following arguments are required: command")
 
     db_path = get_database_path()
+
+    label_to_part = {label: part for part, label in NAME_PART_LABELS.items()}
+
+    def name_parts_to_display(name_parts: dict[str, str]) -> dict[str, str]:
+        return {
+            NAME_PART_LABELS[key]: name_parts.get(key, "") for key in NAME_PART_FIELDS
+        }
+
+    def display_to_name_parts(fields: dict[str, str]) -> dict[str, str]:
+        return compact_name_parts(
+            {
+                label_to_part[label]: value
+                for label, value in fields.items()
+                if label in label_to_part
+            }
+        )
+
+    def build_name_parts_from_args(namespace: argparse.Namespace) -> dict[str, str]:
+        return compact_name_parts(
+            {
+                part_key: getattr(namespace, arg_name)
+                for arg_name, part_key in NAME_SORT_TO_PART.items()
+                if getattr(namespace, arg_name, None) is not None
+            }
+        )
+
+    def has_explicit_name_parts(namespace: argparse.Namespace) -> bool:
+        return any(
+            getattr(namespace, arg_name, None) is not None
+            for arg_name in NAME_SORT_TO_PART
+        )
+
+    def manual_name_parts(current_fields: dict[str, str]) -> dict[str, str]:
+        """Manually enter all fields."""
+        return verify_fields(
+            {
+                label: current_fields.get(label, "")
+                for label in NAME_PART_LABELS.values()
+            },
+            "Review the parsed name components:",
+        )
+
+    def rerun_nameparser(current_fields: dict[str, str]) -> dict[str, str]:
+        """Re-type full name completely."""
+        return name_parts_to_display(
+            parse_name_parts(compose_full_name(display_to_name_parts(current_fields)))
+        )
+
+    def verify_parsed_name(
+        full_name: str, parsed_parts: dict[str, str]
+    ) -> dict[str, str]:
+        verified_parts = verify_fields(
+            name_parts_to_display(parsed_parts),
+            f"Review parsed name components for {full_name!r}:",
+            extra_callbacks={"M": manual_name_parts, "R": rerun_nameparser},
+        )
+        return display_to_name_parts(verified_parts)
 
     if args.command == "list":
         if args.file:
@@ -1437,15 +1828,22 @@ def main():
         day = int(date_match.group(3))
 
         try:
+            name_parts = parse_name_parts(args.name)
+            if has_explicit_name_parts(args):
+                name_parts.update(build_name_parts_from_args(args))
+            elif not args.yes:
+                name_parts = verify_parsed_name(args.name, name_parts)
+
             new_entry = BirthdayEntry(
                 id=uuid.uuid4().hex,
-                full_name=args.name,
+                full_name=compose_full_name(name_parts) or args.name,
                 month=month,
                 day=day,
                 year=year,
                 notes=args.note,
                 groups=flatten_groups(args.group),
                 leap_system=args.leap_system,
+                name_parts=name_parts,
             )
         except ValueError as e:
             print(f"Error creating entry: {e}")
@@ -1461,8 +1859,27 @@ def main():
         if not target:
             sys.exit(1)
 
+        target_name_parts = compact_name_parts(target.name_parts)
+        if not target_name_parts:
+            target_name_parts = parse_name_parts(target.full_name)
+
         if args.name:
-            target.full_name = args.name
+            parsed_name_parts = parse_name_parts(args.name)
+            if has_explicit_name_parts(args):
+                parsed_name_parts.update(build_name_parts_from_args(args))
+            elif not args.yes:
+                parsed_name_parts = verify_parsed_name(args.name, parsed_name_parts)
+            target.name_parts = parsed_name_parts
+            target.full_name = compose_full_name(parsed_name_parts) or args.name
+
+        explicit_parts = build_name_parts_from_args(args)
+        if explicit_parts:
+            target_name_parts.update(explicit_parts)
+            target.name_parts = target_name_parts
+            target.full_name = compose_full_name(target_name_parts) or target.full_name
+        elif args.name is None and target_name_parts:
+            target.name_parts = target_name_parts
+            target.full_name = compose_full_name(target_name_parts) or target.full_name
 
         if args.date:
             date_match = DATE.match(args.date)
@@ -1526,6 +1943,7 @@ def main():
                     entry.notes,
                     merge_group_lists(entry.groups, imported_groups),
                     entry.leap_system,
+                    entry.name_parts,
                 )
                 for entry in incoming
             ]
@@ -1577,6 +1995,42 @@ def main():
                 groups=args.group,
                 match=args.match,
             )
+
+    elif args.command == "repair":
+        if not args.names:
+            print("Please specify a repair action, e.g., 'birthdays repair --names'")
+            sys.exit(1)
+
+        db = load_database(db_path)
+        updated_count = 0
+
+        print("Scanning database for legacy entries...")
+
+        for entry in db:
+            existing_parts = compact_name_parts(entry.name_parts)
+            parsed_parts = parse_name_parts(entry.full_name)
+
+            if args.force:
+                merged_parts = parsed_parts
+            else:
+                merged_parts = dict(existing_parts)
+                for part_key, part_value in parsed_parts.items():
+                    if not merged_parts.get(part_key):
+                        merged_parts[part_key] = part_value
+
+            if merged_parts != existing_parts:
+                entry.name_parts = merged_parts
+                updated_count += 1
+
+        if updated_count > 0:
+            save_database(db, db_path)
+            mode = "overwritten" if args.force else "backfilled"
+            print(
+                f"Successfully parsed and {mode} name parts "
+                f"for {updated_count} entries."
+            )
+        else:
+            print("All entries are already up to date. Nothing to repair.")
 
     sys.exit(0)
 

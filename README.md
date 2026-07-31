@@ -12,9 +12,10 @@
 
 ## Features
 
-- **Customizable Sorting:** List birthdays exactly how you want to see them (by upcoming, recent, age, name, or date)
+- **Customizable Sorting:** List birthdays exactly how you want to see them (by upcoming, recent, age, date, (full) name or specific name components like `first_name` and `last_name`).
 - **CRUD Operations:** Easily `add`, `edit`, and `delete` entries. The deletion and edit commands feature a convenient fuzzy search so you don't have to type out exact names
 - **Smart Imports:** Import contacts directly from `.vcf` vCard files or JSON databases
+- **Smart Name Parsing**: Automatically breaks down names into distinct parts, letting you easily verify and adjust them via an interactive prompt.
 - **Interactive Merging:** During imports, the CLI intelligently detects duplicates or data collisions and prompts you to safely merge them
 - **Leapling Support:** Configure how leap year birthdays (February 29th) are handled in non-leap years, choosing to celebrate either the day before or the day after
 - **Organizational Groups:** Assign contacts to custom tags (like `family`, `friends`, or `coworkers`) to keep your database organized and filter terminal outputs.
@@ -57,6 +58,9 @@ birthdays list
 # List sorted by age in ascending order
 birthdays list --sort age --order asc
 
+# List sorted alphabetically by last name
+birthdays list --sort last_name --order asc
+
 # Temporarily read and display birthdays directly from a file without modifying your local database
 birthdays list --file ./contacts.vcf
 
@@ -84,6 +88,9 @@ birthdays add "John Doe" 1990-05-14 --note "Loves chocolate cake"
 ```bash
 birthdays edit "John Doe" --date 1991-05-14
 ```
+
+> [!TIP]
+> The CLI will interactively prompt you to verify the parsed name parts when **adding** / **editing**. To bypass this, append `-y` to automatically accept the parser's result, or provide explicit flags for scripting (e.g., `--first-name "John" --last-name "Doe"`).
 
 ### Deleting an Entry
 
@@ -132,6 +139,23 @@ birthdays motd disable
 ```
 
 This safely removes the MOTD sentinel block from your shell configuration without affecting surrounding custom code.
+
+### Database Maintenance
+
+> [!NOTE]
+> If you are upgrading from an older version of `birthdays`, your existing entries won't have the new structured name components. You can backfill them automatically.
+
+**Repair and backfill missing name parts:**
+
+```bash
+birthdays repair --names
+```
+
+**Force a complete resync of all name parts from their full names:**
+
+```bash
+birthdays repair --names --force
+```
 
 ## Configurations
 
