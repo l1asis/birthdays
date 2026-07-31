@@ -17,8 +17,9 @@
 - **Smart Imports:** Import contacts directly from `.vcf` vCard files or JSON databases
 - **Interactive Merging:** During imports, the CLI intelligently detects duplicates or data collisions and prompts you to safely merge them
 - **Leapling Support:** Configure how leap year birthdays (February 29th) are handled in non-leap years, choosing to celebrate either the day before or the day after
+- **Organizational Groups:** Assign contacts to custom tags (like `family`, `friends`, or `coworkers`) to keep your database organized and filter terminal outputs.
 - **Festive UI:** Every date is assigned a unique, deterministic emoji to keep the terminal vibe bright and colorful *(can be disabled via a global flag or environment variables)*
-- **Shell MOTD:** Automatically display a summary of upcoming birthdays when opening a new terminal session, complete with safe, automated hooks for `.bashrc`, `.zshrc`, `config.fish`, and `PowerShell` profiles.
+- **Shell MOTD:** Automatically display a summary of upcoming birthdays when opening a new terminal session, complete with safe, automated hooks for `.bashrc`, `.zshrc`, `config.fish`, and `PowerShell` profiles
 
 ## Requirements
 
@@ -58,6 +59,12 @@ birthdays list --sort age --order asc
 
 # Temporarily read and display birthdays directly from a file without modifying your local database
 birthdays list --file ./contacts.vcf
+
+# Show categorized entries
+birthdays list --view groups
+
+# Filter by groups and a condition
+birthdays list -g coworkers -g friends --match all
 ```
 
 ### Adding an Entry
