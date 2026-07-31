@@ -1562,6 +1562,12 @@ def setup_parser() -> argparse.ArgumentParser:
     parser_add.add_argument("--last-name", type=str, help="Last name")
     parser_add.add_argument("--suffix", type=str, help="Name suffix")
     parser_add.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="Skip interactive name verification and accept parsed parts",
+    )
+    parser_add.add_argument(
         "-g",
         "--group",
         action="append",
@@ -1587,6 +1593,12 @@ def setup_parser() -> argparse.ArgumentParser:
     parser_edit.add_argument("--middle-name", type=str, help="Update the middle name")
     parser_edit.add_argument("--last-name", type=str, help="Update the last name")
     parser_edit.add_argument("--suffix", type=str, help="Update the name suffix")
+    parser_edit.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="Skip interactive name verification and accept parsed parts",
+    )
     parser_edit.add_argument(
         "-g",
         "--group",
@@ -1819,7 +1831,7 @@ def main():
             name_parts = parse_name_parts(args.name)
             if has_explicit_name_parts(args):
                 name_parts.update(build_name_parts_from_args(args))
-            else:
+            elif not args.yes:
                 name_parts = verify_parsed_name(args.name, name_parts)
 
             new_entry = BirthdayEntry(
@@ -1855,7 +1867,7 @@ def main():
             parsed_name_parts = parse_name_parts(args.name)
             if has_explicit_name_parts(args):
                 parsed_name_parts.update(build_name_parts_from_args(args))
-            else:
+            elif not args.yes:
                 parsed_name_parts = verify_parsed_name(args.name, parsed_name_parts)
             target.name_parts = parsed_name_parts
             target.full_name = compose_full_name(parsed_name_parts) or args.name
