@@ -1,3 +1,10 @@
+# [0.7.0](https://github.com/l1asis/birthdays/compare/0.6.0...0.7.0) (2026-07-31)
+
+
+### Features
+
+* ✨ export birthdays in iCalendar `.ics` format ([#22](https://github.com/l1asis/birthdays/issues/22)) ([f4328d1](https://github.com/l1asis/birthdays/commit/f4328d14e91238a08a768178be9d3585a8e3bea1))
+
 # [0.6.0](https://github.com/l1asis/birthdays/compare/0.5.0...0.6.0) (2026-07-31)
 
 
