@@ -480,6 +480,67 @@ def compose_full_name(name_parts: dict[str, str]) -> str:
     """Rebuild a display name from ordered name components."""
     ordered_parts = [normalize_text(name_parts.get(key)) for key in NAME_PART_FIELDS]
     return " ".join(part for part in ordered_parts if part)
+
+
+def prefer_text_value(
+    existing_value: str | None,
+    incoming_value: str | None,
+    *,
+    field_label: str,
+    interactive: bool,
+) -> str:
+    """Prefer the most complete non-empty string and only prompt on true conflicts."""
+    existing_text = normalize_text(existing_value)
+    incoming_text = normalize_text(incoming_value)
+
+    if not existing_text:
+        return incoming_text
+    if not incoming_text:
+        return existing_text
+    if existing_text.casefold() == incoming_text.casefold():
+        return existing_text
+
+    if len(existing_text) != len(incoming_text):
+        preferred = (
+            incoming_text if len(incoming_text) > len(existing_text) else existing_text
+        )
+        if not interactive:
+            return preferred
+        if existing_text in incoming_text or incoming_text in existing_text:
+            return preferred
+    else:
+        preferred = incoming_text
+        if not interactive:
+            return preferred
+
+    if confirm(
+        f"{field_label} differs. Keep incoming value {incoming_text!r}?",
+        required=True,
+    ):
+        return incoming_text
+    return existing_text
+
+
+def merge_name_parts(
+    existing_parts: dict[str, str],
+    incoming_parts: dict[str, str],
+    *,
+    interactive: bool,
+) -> dict[str, str]:
+    """Merge name components while preferring populated values."""
+    merged: dict[str, str] = {}
+
+    for part_key in NAME_PART_FIELDS:
+        merged_value = prefer_text_value(
+            existing_parts.get(part_key),
+            incoming_parts.get(part_key),
+            field_label=NAME_PART_LABELS[part_key],
+            interactive=interactive,
+        )
+        if merged_value:
+            merged[part_key] = merged_value
+
+    return merged
 def normalize_group(group: str) -> str:
     """Normalize a single group label for storage and matching."""
     return group.strip().replace(r"\n", " ").replace(r"\,", ",").casefold()
