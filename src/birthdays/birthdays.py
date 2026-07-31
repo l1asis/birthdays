@@ -1006,7 +1006,7 @@ def display_birthdays(
     entries: List[BirthdayEntry],
     sort_by: Literal["name", "date", "upcoming", "recent", "age"] = "upcoming",
     sort_order: Literal["asc", "desc"] = "desc",
-    view_style: Literal["simple", "table", "calendar"] = "simple",
+    view_style: Literal["simple", "table", "calendar", "groups"] = "simple",
     use_emoji: bool = True,
     should_sort: bool = True,
     show_header_date: bool = False,
@@ -1017,7 +1017,64 @@ def display_birthdays(
     if should_sort:
         entries = sort_entries(entries, sort_by, sort_order)
 
-    if view_style == "simple":
+    if view_style == "groups":
+        if show_header_date:
+            date_str = today.strftime("%A, %b %d")
+            print(f"Birthdays for {date_str}{' 🎂' if use_emoji else ''}")
+        else:
+            print(f"Birthdays{' 🎂' if use_emoji else ''}")
+
+        grouped_entries: dict[str, list[BirthdayEntry]] = defaultdict(list)
+        for entry in entries:
+            primary_group = entry.groups[0] if entry.groups else "ungrouped"
+            grouped_entries[primary_group].append(entry)
+
+        ordered_groups = sorted(
+            grouped_entries,
+            key=lambda group: (group == "ungrouped", group.casefold()),
+        )
+
+        for group_name in ordered_groups:
+            print(f"\n{group_name}")
+            for entry in grouped_entries[group_name]:
+                age = entry.get_age()
+                next_in = entry.next_occurrence_in(today)
+                prev_in = entry.prev_occurrence_in(today)
+
+                emoji = date_to_emoji(entry.year, entry.month, entry.day)
+                group_suffix = (
+                    f" (also in: {', '.join(entry.groups[1:])})"
+                    if len(entry.groups) > 1
+                    else ""
+                )
+                print(f"{emoji if use_emoji else '->'}  {entry}{group_suffix}")
+
+                if entry.is_today():
+                    age = f"{to_ordinal(age)} " if age is not None else ""
+                    print(f"    Has a {age}birthday today{' 🥳' if use_emoji else '!'}")
+                else:
+                    age = f"{age} y.o., " if age is not None else ""
+                    months = tuple(
+                        f" {delta.months} month{'s' if delta.months > 1 else ''}"
+                        if delta.months > 0
+                        else ""
+                        for delta in (next_in, prev_in)
+                    )
+                    days = tuple(
+                        (
+                            f"{' and' if delta.months else ''} "
+                            f"{delta.days} day{'s' if delta.days > 1 else ''}"
+                        )
+                        if delta.days > 0
+                        else ""
+                        for delta in (next_in, prev_in)
+                    )
+                    if sort_by != "recent":
+                        print(f"    {age}Next in{months[0]}{days[0]}")
+                    elif sort_by == "recent":
+                        print(f"    {age}Previous:{months[1]}{days[1]} ago")
+
+    elif view_style == "simple":
         if show_header_date:
             date_str = today.strftime("%A, %b %d")
             print(f"Birthdays for {date_str}{' 🎂' if use_emoji else ''}")
