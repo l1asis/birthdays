@@ -1940,6 +1940,25 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Overwrite the output file if it already exists",
     )
 
+    parser_clear = subparsers.add_parser(
+        "clear", help="Delete all birthdays from the database"
+    )
+    parser_clear.add_argument(
+        "-y", "--yes", action="store_true", help="Skip the confirmation prompt"
+    )
+    parser_clear.add_argument(
+        "-g",
+        "--group",
+        action="append",
+        help="Only clear entries belonging to one or more groups",
+    )
+    parser_clear.add_argument(
+        "--match",
+        choices=["any", "all"],
+        default="any",
+        help="Match any selected group or require all of them",
+    )
+
     return parser
 
 
