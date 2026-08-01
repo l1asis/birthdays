@@ -971,12 +971,7 @@ def merge_entries(
                 continue
 
             if interactive:
-                print(
-                    (
-                        f"\nExact name match found for this contact, "
-                        "but data differs."
-                    )
-                )
+                print(("\nExact name match found for this contact, but data differs."))
                 print(f"Existing: {match}")
                 print(f"Incoming: {new_entry}")
                 if confirm("Update existing contact?"):
@@ -1730,11 +1725,21 @@ def setup_parser() -> argparse.ArgumentParser:
         "--date", type=str, help="Update the birthday (YYYY-MM-DD | MM-DD)"
     )
     parser_edit.add_argument("--note", type=str, help="Update the attached note")
-    parser_edit.add_argument("--prefix", type=str, help="Update the contact name prefix")
-    parser_edit.add_argument("--first-name", type=str, help="Update the contact first name")
-    parser_edit.add_argument("--middle-name", type=str, help="Update the contact middle name")
-    parser_edit.add_argument("--last-name", type=str, help="Update the contact last name")
-    parser_edit.add_argument("--suffix", type=str, help="Update the contact name suffix")
+    parser_edit.add_argument(
+        "--prefix", type=str, help="Update the contact name prefix"
+    )
+    parser_edit.add_argument(
+        "--first-name", type=str, help="Update the contact first name"
+    )
+    parser_edit.add_argument(
+        "--middle-name", type=str, help="Update the contact middle name"
+    )
+    parser_edit.add_argument(
+        "--last-name", type=str, help="Update the contact last name"
+    )
+    parser_edit.add_argument(
+        "--suffix", type=str, help="Update the contact name suffix"
+    )
     parser_edit.add_argument(
         "-y",
         "--yes",
