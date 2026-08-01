@@ -13,7 +13,7 @@
 ## Features
 
 - **Customizable Sorting:** List birthdays exactly how you want to see them (by upcoming, recent, age, date, (full) name or specific name components like `first_name` and `last_name`).
-- **CRUD Operations:** Easily `add`, `edit`, and `delete` entries. The deletion and edit commands feature a convenient fuzzy search so you don't have to type out exact names
+- **CRUD Operations:** Easily `add`, `edit`, and `delete` contacts. The deletion and edit commands feature a convenient fuzzy search so you don't have to type out exact names
 - **Smart Imports:** Import contacts directly from `.vcf` vCard files or JSON databases
 - **Smart Name Parsing**: Automatically breaks down names into distinct parts, letting you easily verify and adjust them via an interactive prompt.
 - **Interactive Merging:** During imports, the CLI intelligently detects duplicates or data collisions and prompts you to safely merge them
@@ -65,14 +65,14 @@ birthdays list --sort last_name --order asc
 # Temporarily read and display birthdays directly from a file without modifying your local database
 birthdays list --file ./contacts.vcf
 
-# Show categorized entries
+# Show categorized contacts
 birthdays list --view groups
 
 # Filter by groups and a condition
 birthdays list -g coworkers -g friends --match all
 ```
 
-### Adding an Entry
+### Adding a Contact
 
 > [!NOTE]
 > The date can be formatted as `YYYY-MM-DD`, or simply `MM-DD` if the year is unknown.
@@ -81,7 +81,7 @@ birthdays list -g coworkers -g friends --match all
 birthdays add "John Doe" 1990-05-14 --note "Loves chocolate cake"
 ```
 
-### Editing an Entry
+### Editing a Contact
 
 > [!NOTE]
 > You can use either the name or UUID. You only need to pass the flags for the specific data you want to change.
@@ -93,7 +93,7 @@ birthdays edit "John Doe" --date 1991-05-14
 > [!TIP]
 > The CLI will interactively prompt you to verify the parsed name parts when **adding** / **editing**. To bypass this, append `-y` to automatically accept the parser's result, or provide explicit flags for scripting (e.g., `--first-name "John" --last-name "Doe"`).
 
-### Deleting an Entry
+### Deleting a Contact
 
 > [!TIP]
 > The CLI uses fuzzy matching, so typing a partial name usually works! Append `-y` to skip the confirmation prompt.
@@ -102,29 +102,26 @@ birthdays edit "John Doe" --date 1991-05-14
 birthdays delete "John Doe"
 ```
 
-### Deleting Multiple Entries
+### Deleting Multiple Contacts
 
 > [!WARNING]
-> This will permanently delete all entries in your database. Use with caution.
+> This will permanently delete contacts from your database. Use with caution.
 
 ```bash
+# Clear the entire database
 birthdays clear
-```
 
-You can also target a specific group to delete, or append `-y` to skip the safety confirmation prompt:
-
-```bash
+# Clear contacts belonging to a specific group
 birthdays clear -g acquaintances
-```
 
-```bash
+# Clear silently without a confirmation prompt
 birthdays clear -y
 ```
 
 ### Importing Contacts
 
 > [!TIP]
-> The interactive prompt will guide you through any data collisions. Append `-y` to automatically skip these prompts and blindly merge safe entries.
+> The interactive prompt will guide you through any data collisions. Append `-y` to automatically skip these prompts and blindly merge safe contacts.
 
 ```bash
 birthdays import ./contacts.vcf
@@ -162,7 +159,7 @@ This safely removes the MOTD sentinel block from your shell configuration withou
 ### Database Maintenance
 
 > [!NOTE]
-> If you are upgrading from an older version of `birthdays`, your existing entries won't have the new structured name components. You can backfill them automatically.
+> If you are upgrading from an older version of `birthdays`, your existing contacts won't have the new structured name components. You can backfill them automatically.
 
 **Repair and backfill missing name parts:**
 
@@ -174,15 +171,6 @@ birthdays repair --names
 
 ```bash
 birthdays repair --names --force
-```
-
-Here are the additions to include in your README to document the new export feature.
-
-Add this bullet point to the `## Features` section:
-
-```md
-- **iCalendar Export:** Generate standard `.ics` files to import into your favorite calendar app, complete with customizable reminders, dynamic text templates, and proper leap year handling.
-
 ```
 
 ### Exporting to iCalendar (.ics)
