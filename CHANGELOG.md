@@ -1,3 +1,10 @@
+# [0.8.0](https://github.com/l1asis/birthdays/compare/0.7.1...0.8.0) (2026-08-01)
+
+
+### Features
+
+* ✨ clear command for bulk database deletion ([#37](https://github.com/l1asis/birthdays/issues/37)) ([c1f95c2](https://github.com/l1asis/birthdays/commit/c1f95c2eb9af4ec8849be1e6e3fe630dcc40aa66))
+
 ## [0.7.1](https://github.com/l1asis/birthdays/compare/0.7.0...0.7.1) (2026-07-31)
 
 
