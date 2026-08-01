@@ -1940,6 +1940,25 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Overwrite the output file if it already exists",
     )
 
+    parser_clear = subparsers.add_parser(
+        "clear", help="Delete all birthdays from the database"
+    )
+    parser_clear.add_argument(
+        "-y", "--yes", action="store_true", help="Skip the confirmation prompt"
+    )
+    parser_clear.add_argument(
+        "-g",
+        "--group",
+        action="append",
+        help="Only clear entries belonging to one or more groups",
+    )
+    parser_clear.add_argument(
+        "--match",
+        choices=["any", "all"],
+        default="any",
+        help="Match any selected group or require all of them",
+    )
+
     return parser
 
 
@@ -2322,6 +2341,52 @@ def main():
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_bytes(ics_bytes)
             print(f"Successfully exported {len(entries)} contact(s) to '{out_path}'.")
+
+    elif args.command == "clear":
+        db = load_database(db_path)
+
+        if not db:
+            print("The database is already empty. Nothing to clear.")
+            sys.exit(0)
+
+        if args.group:
+            group_filters = flatten_groups(args.group)
+            entries = [
+                entry
+                for entry in db
+                if matches_group_filter(entry, group_filters, args.match)
+            ]
+        else:
+            entries = db
+
+        if not entries:
+            print("No entries match the specified criteria. Nothing to clear.")
+            sys.exit(0)
+
+        if not args.yes:
+            if not confirm(
+                f"Are you sure you want to delete {'all ' if len(entries) > 1 else ''}"
+                f"{len(entries)} birthday{'s' if len(entries) != 1 else ''}? "
+                "This action cannot be undone."
+            ):
+                print("Clear operation cancelled.")
+                sys.exit(0)
+
+        # Optimized filtering using a set of IDs
+        delete_ids = {entry.id for entry in entries}
+        remaining_entries = [entry for entry in db if entry.id not in delete_ids]
+
+        save_database(remaining_entries, db_path)
+
+        print(f"Deleted {len(entries)} birthday{'s' if len(entries) != 1 else ''}.")
+        if not remaining_entries:
+            print("The database is now empty.")
+        else:
+            print(
+                f"{len(remaining_entries)} "
+                f"birthday{'s' if len(remaining_entries) != 1 else ''} "
+                "remain in the database."
+            )
 
     sys.exit(0)
 

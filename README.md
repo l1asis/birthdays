@@ -102,6 +102,25 @@ birthdays edit "John Doe" --date 1991-05-14
 birthdays delete "John Doe"
 ```
 
+### Deleting Multiple Entries
+
+> [!WARNING]
+> This will permanently delete all entries in your database. Use with caution.
+
+```bash
+birthdays clear
+```
+
+You can also target a specific group to delete, or append `-y` to skip the safety confirmation prompt:
+
+```bash
+birthdays clear -g acquaintances
+```
+
+```bash
+birthdays clear -y
+```
+
 ### Importing Contacts
 
 > [!TIP]
