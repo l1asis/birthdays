@@ -1,3 +1,10 @@
+## [0.8.1](https://github.com/l1asis/birthdays/compare/0.8.0...0.8.1) (2026-08-01)
+
+
+### Bug Fixes
+
+* 🐛 standardize terminology in CLI messages and README ([#39](https://github.com/l1asis/birthdays/issues/39)) ([192422d](https://github.com/l1asis/birthdays/commit/192422df46616b596422edff6d229fed02954aff))
+
 # [0.8.0](https://github.com/l1asis/birthdays/compare/0.7.1...0.8.0) (2026-08-01)
 
 
