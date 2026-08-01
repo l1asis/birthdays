@@ -945,7 +945,7 @@ def merge_entries(
                     existing_map[new_entry.full_name],
                     prompt=(
                         f"\nMultiple exact matches for '{new_entry.full_name}'. "
-                        "Which one to merge into?"
+                        "Which contact should this merge into?"
                     ),
                     extra={"S": "Skip this contact entirely"},
                     required=True,
@@ -973,13 +973,13 @@ def merge_entries(
             if interactive:
                 print(
                     (
-                        f"\nExact name match found for '{new_entry.full_name}', "
+                        f"\nExact name match found for this contact, "
                         "but data differs."
                     )
                 )
                 print(f"Existing: {match}")
                 print(f"Incoming: {new_entry}")
-                if confirm("Update existing entry?"):
+                if confirm("Update existing contact?"):
                     final_db[match.id] = merge_pair(match, new_entry)
             else:
                 final_db[match.id] = merge_pair(match, new_entry, interactive=False)
@@ -1004,7 +1004,7 @@ def merge_entries(
                 choice = choose(
                     options,
                     extra={
-                        "A": "Add as completely new entry",
+                        "A": "Add as a new contact",
                         "S": "Skip this contact entirely",
                     },
                     required=True,
@@ -1069,7 +1069,7 @@ def find_entry(db: List[BirthdayEntry], identifier: str) -> BirthdayEntry | None
                     matches.append(entry)
 
     if not matches:
-        print(f"Error: No entry found matching '{identifier}'.")
+        print(f"Error: No contact found matching '{identifier}'.")
         return None
 
     if len(matches) == 1:
@@ -1077,7 +1077,7 @@ def find_entry(db: List[BirthdayEntry], identifier: str) -> BirthdayEntry | None
 
     choice = choose(
         matches,
-        prompt=f"\nMultiple entries found for '{identifier}'. Which one did you mean?",
+        prompt=f"\nMultiple contacts found for '{identifier}'. Which one did you mean?",
         extra={"S": "Skip/Cancel"},
         required=True,
     )
@@ -1673,7 +1673,7 @@ def setup_parser() -> argparse.ArgumentParser:
         "-g",
         "--group",
         action="append",
-        help="Filter entries by one or more groups",
+        help="Filter contacts by one or more groups",
     )
     parser_list.add_argument(
         "--match",
@@ -1694,15 +1694,15 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Fallback leap system when reading dynamically from a .vcf file",
     )
 
-    parser_add = subparsers.add_parser("add", help="Manually add a new birthday")
-    parser_add.add_argument("name", type=str, help="Full name of the person")
+    parser_add = subparsers.add_parser("add", help="Manually add a new contact")
+    parser_add.add_argument("name", type=str, help="Full name of the contact")
     parser_add.add_argument("date", type=str, help="Birthday (YYYY-MM-DD | MM-DD)")
     parser_add.add_argument("--note", type=str, help="Optional note to attach")
-    parser_add.add_argument("--prefix", type=str, help="Name prefix")
-    parser_add.add_argument("--first-name", type=str, help="First name")
-    parser_add.add_argument("--middle-name", type=str, help="Middle name")
-    parser_add.add_argument("--last-name", type=str, help="Last name")
-    parser_add.add_argument("--suffix", type=str, help="Name suffix")
+    parser_add.add_argument("--prefix", type=str, help="Contact name prefix")
+    parser_add.add_argument("--first-name", type=str, help="Contact first name")
+    parser_add.add_argument("--middle-name", type=str, help="Contact middle name")
+    parser_add.add_argument("--last-name", type=str, help="Contact last name")
+    parser_add.add_argument("--suffix", type=str, help="Contact name suffix")
     parser_add.add_argument(
         "-y",
         "--yes",
@@ -1713,7 +1713,7 @@ def setup_parser() -> argparse.ArgumentParser:
         "-g",
         "--group",
         action="append",
-        help="Assign one or more groups to the new entry",
+        help="Assign one or more groups to the new contact",
     )
     parser_add.add_argument(
         "--leap-system",
@@ -1723,18 +1723,18 @@ def setup_parser() -> argparse.ArgumentParser:
         help="When leaplings celebrate in non-leap years (default: before)",
     )
 
-    parser_edit = subparsers.add_parser("edit", help="Modify an existing entry")
-    parser_edit.add_argument("identifier", type=str, help="Name or UUID of the person")
+    parser_edit = subparsers.add_parser("edit", help="Modify an existing contact")
+    parser_edit.add_argument("identifier", type=str, help="Name or UUID of the contact")
     parser_edit.add_argument("--name", type=str, help="Update the full name")
     parser_edit.add_argument(
         "--date", type=str, help="Update the birthday (YYYY-MM-DD | MM-DD)"
     )
     parser_edit.add_argument("--note", type=str, help="Update the attached note")
-    parser_edit.add_argument("--prefix", type=str, help="Update the name prefix")
-    parser_edit.add_argument("--first-name", type=str, help="Update the first name")
-    parser_edit.add_argument("--middle-name", type=str, help="Update the middle name")
-    parser_edit.add_argument("--last-name", type=str, help="Update the last name")
-    parser_edit.add_argument("--suffix", type=str, help="Update the name suffix")
+    parser_edit.add_argument("--prefix", type=str, help="Update the contact name prefix")
+    parser_edit.add_argument("--first-name", type=str, help="Update the contact first name")
+    parser_edit.add_argument("--middle-name", type=str, help="Update the contact middle name")
+    parser_edit.add_argument("--last-name", type=str, help="Update the contact last name")
+    parser_edit.add_argument("--suffix", type=str, help="Update the contact name suffix")
     parser_edit.add_argument(
         "-y",
         "--yes",
@@ -1745,7 +1745,7 @@ def setup_parser() -> argparse.ArgumentParser:
         "-g",
         "--group",
         action="append",
-        help="Assign one or more groups to the entry",
+        help="Assign one or more groups to the contact",
     )
     parser_edit.add_argument(
         "--leap-system",
@@ -1754,9 +1754,9 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Update when this leapling celebrates in non-leap years",
     )
 
-    parser_delete = subparsers.add_parser("delete", help="Delete an entry")
+    parser_delete = subparsers.add_parser("delete", help="Delete a contact")
     parser_delete.add_argument(
-        "identifier", type=str, help="Name or UUID of the person"
+        "identifier", type=str, help="Name or UUID of the contact"
     )
     parser_delete.add_argument(
         "-y", "--yes", action="store_true", help="Skip the confirmation prompt"
@@ -1764,14 +1764,14 @@ def setup_parser() -> argparse.ArgumentParser:
 
     parser_import = subparsers.add_parser(
         "import",
-        help="Import birthdays from a vCard or JSON file",
+        help="Import contacts from a vCard or JSON file",
     )
-    parser_import.add_argument("file", type=Path, help="Path to the .vcf file")
+    parser_import.add_argument("file", type=Path, help="Path to the .vcf or .json file")
     parser_import.add_argument(
         "-y",
         "--yes",
         action="store_true",
-        help="Skip interactive collision prompts and auto-merge safe entries",
+        help="Skip interactive collision prompts and auto-merge safe contacts",
     )
     parser_import.add_argument(
         "-g",
@@ -1805,7 +1805,7 @@ def setup_parser() -> argparse.ArgumentParser:
         "-g",
         "--group",
         action="append",
-        help="Filter entries by one or more groups",
+        help="Filter contacts by one or more groups",
     )
     parser_motd.add_argument(
         "--match",
@@ -1817,7 +1817,7 @@ def setup_parser() -> argparse.ArgumentParser:
         "--days", type=int, default=7, help="Days ahead to check for birthdays"
     )
     parser_motd.add_argument(
-        "--limit", type=int, default=3, help="Max entries to print directly"
+        "--limit", type=int, default=3, help="Max birthdays to print directly"
     )
     parser_motd.add_argument(
         "--quiet-if-empty", action="store_true", help="Exit silently if no birthdays"
@@ -1832,12 +1832,12 @@ def setup_parser() -> argparse.ArgumentParser:
     )
 
     parser_repair = subparsers.add_parser(
-        "repair", help="Run maintenance to fix or backfill missing database fields"
+        "repair", help="Run maintenance to fix or backfill missing contact fields"
     )
     parser_repair.add_argument(
         "--names",
         action="store_true",
-        help="Parse and fill missing name components for legacy database entries",
+        help="Parse and fill missing name components for legacy contact records",
     )
     parser_repair.add_argument(
         "--force",
@@ -1846,7 +1846,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
 
     parser_export = subparsers.add_parser(
-        "export", help="Export birthdays to an iCalendar (.ics) file"
+        "export", help="Export contacts to an iCalendar (.ics) file"
     )
     parser_export.add_argument(
         "output",
@@ -1915,7 +1915,7 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Template for the alarm notification text.",
     )
     parser_export.add_argument(
-        "-g", "--group", action="append", help="Filter entries by one or more groups"
+        "-g", "--group", action="append", help="Filter contacts by one or more groups"
     )
     parser_export.add_argument(
         "--match",
@@ -1941,7 +1941,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
 
     parser_clear = subparsers.add_parser(
-        "clear", help="Delete all birthdays from the database"
+        "clear", help="Delete all contacts from the database"
     )
     parser_clear.add_argument(
         "-y", "--yes", action="store_true", help="Skip the confirmation prompt"
@@ -1950,7 +1950,7 @@ def setup_parser() -> argparse.ArgumentParser:
         "-g",
         "--group",
         action="append",
-        help="Only clear entries belonging to one or more groups",
+        help="Only clear contacts belonging to one or more groups",
     )
     parser_clear.add_argument(
         "--match",
@@ -2102,12 +2102,12 @@ def main():
                 name_parts=name_parts,
             )
         except ValueError as e:
-            print(f"Error creating entry: {e}")
+            print(f"Error creating contact: {e}")
             sys.exit(1)
 
         db.append(new_entry)
         save_database(db, db_path)
-        print(f"Added: {new_entry}")
+        print(f"Added contact: {new_entry}")
 
     elif args.command == "edit":
         db = load_database(db_path)
@@ -2224,11 +2224,11 @@ def main():
             print("The database was left unchanged.")
         else:
             if added_count:
-                print(f"Added {added_count} entr{'y' if added_count == 1 else 'ies'}.")
+                print(f"Added {added_count} contact{'s' if added_count != 1 else ''}.")
             if updated_count:
                 print(
                     f"Updated {updated_count} "
-                    f"entr{'y' if updated_count == 1 else 'ies'}."
+                    f"contact{'s' if updated_count != 1 else ''}."
                 )
 
     elif args.command == "motd":
@@ -2260,7 +2260,7 @@ def main():
         db = load_database(db_path)
         updated_count = 0
 
-        print("Scanning database for legacy entries...")
+        print("Scanning database for legacy contacts...")
 
         for entry in db:
             existing_parts = compact_name_parts(entry.name_parts)
@@ -2283,10 +2283,10 @@ def main():
             mode = "overwritten" if args.force else "backfilled"
             print(
                 f"Successfully parsed and {mode} name parts "
-                f"for {updated_count} entries."
+                f"for {updated_count} contacts."
             )
         else:
-            print("All entries are already up to date. Nothing to repair.")
+            print("All contacts are already up to date. Nothing to repair.")
 
     elif args.command == "export":
         if args.file:
@@ -2301,7 +2301,7 @@ def main():
             entries = load_database(db_path)
 
         if not entries:
-            print("No birthdays found to export.")
+            print("No contacts found to export.")
             sys.exit(0)
 
         group_filters = flatten_groups(args.group)
@@ -2313,7 +2313,7 @@ def main():
             ]
 
         if not entries:
-            print("No birthdays match the specified groups.")
+            print("No contacts match the specified groups.")
             sys.exit(0)
 
         cal = build_ical(
@@ -2340,7 +2340,10 @@ def main():
 
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_bytes(ics_bytes)
-            print(f"Successfully exported {len(entries)} contact(s) to '{out_path}'.")
+            print(
+                f"Successfully exported {len(entries)} contact"
+                f"{'s' if len(entries) != 1 else ''} to '{out_path}'."
+            )
 
     elif args.command == "clear":
         db = load_database(db_path)
@@ -2360,13 +2363,13 @@ def main():
             entries = db
 
         if not entries:
-            print("No entries match the specified criteria. Nothing to clear.")
+            print("No contacts match the specified criteria. Nothing to clear.")
             sys.exit(0)
 
         if not args.yes:
             if not confirm(
                 f"Are you sure you want to delete {'all ' if len(entries) > 1 else ''}"
-                f"{len(entries)} birthday{'s' if len(entries) != 1 else ''}? "
+                f"{len(entries)} contact{'s' if len(entries) != 1 else ''}? "
                 "This action cannot be undone."
             ):
                 print("Clear operation cancelled.")
@@ -2378,13 +2381,13 @@ def main():
 
         save_database(remaining_entries, db_path)
 
-        print(f"Deleted {len(entries)} birthday{'s' if len(entries) != 1 else ''}.")
+        print(f"Deleted {len(entries)} contact{'s' if len(entries) != 1 else ''}.")
         if not remaining_entries:
             print("The database is now empty.")
         else:
             print(
                 f"{len(remaining_entries)} "
-                f"birthday{'s' if len(remaining_entries) != 1 else ''} "
+                f"contact{'s' if len(remaining_entries) != 1 else ''} "
                 "remain in the database."
             )
 
