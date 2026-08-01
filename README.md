@@ -188,6 +188,14 @@ birthdays export ./family.ics -g family --alarm-days 2 --alarm-time "10:00" --ti
 
 ## Configurations
 
+### Database Path
+
+By default, `birthdays` stores your `birthdays.json` database in your operating system's standard user data directory. If you want to use a custom location (for example, to sync your database via Dropbox, Nextcloud, or a dotfiles repository), you can override this behavior by setting the `BIRTHDAYS_HOME` environment variable.
+
+- `BIRTHDAYS_HOME=/path/to/your/custom/folder`
+
+The tool will automatically create the directory and the `birthdays.json` file inside it if they do not already exist.
+
 ### Emojis
 
 You can disable emojis globally across all subcommands by placing the `--no-emoji` flag *before* the subcommand (e.g., `birthdays --no-emoji list`).
