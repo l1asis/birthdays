@@ -47,6 +47,13 @@ Issues = "https://github.com/l1asis/birthdays/issues"
 birthdays = "birthdays.birthdays:main"
 bday = "birthdays.birthdays:main"
 
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/birthdays"]
 

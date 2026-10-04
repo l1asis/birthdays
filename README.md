@@ -219,6 +219,19 @@ For a more permanent solution, `birthdays` respects the following environment va
 
 Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
+Install the development tools and run the tests before opening a pull request:
+
+```sh
+python -m pip install -e ".[dev]"
+python -m pytest
+ruff check .
+ruff format --check .
+```
+
+The suite uses synthetic contacts and exercises pure core logic without reading
+or writing your birthday database. GitHub Actions also runs it on Python 3.11
+and 3.14, and releases require the test job to pass.
+
 1. Fork the Project
 2. Create your Feature Branch (`git checkout -b feat/amazing-feature`)
 3. Commit your Changes (`git commit -m 'feat: ✨ add some amazing-feature'`)
