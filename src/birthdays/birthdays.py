@@ -1530,6 +1530,7 @@ def build_ical(
 
         if years == 0:
             event = Event()
+            event.add("transp", "TRANSPARENT")  # type: ignore
             event.add("uid", entry.id)  # type: ignore
             event.add("dtstamp", datetime.datetime.now())  # type: ignore
 
@@ -1573,6 +1574,7 @@ def build_ical(
                 )
 
                 event = Event()
+                event.add("transp", "TRANSPARENT")  # type: ignore
                 event.add("uid", f"{entry.id}-{target_year}")  # type: ignore
                 event.add("dtstamp", datetime.datetime.now())  # type: ignore
                 event.add("dtstart", exact_date)  # type: ignore
