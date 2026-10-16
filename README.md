@@ -223,4 +223,4 @@ See [`CONTRIBUTING.md`](https://github.com/l1asis/birthdays/blob/main/CONTRIBUTI
 
 ## License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the MIT License. See [`LICENSE`](https://github.com/l1asis/birthdays/blob/main/LICENSE) for more information.
