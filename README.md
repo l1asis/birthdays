@@ -217,13 +217,9 @@ For a more permanent solution, `birthdays` respects the following environment va
 
 ## Contributing
 
-Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+Contributions are what make the open source community such an amazing place to learn, inspire, and create. Your contributions are greatly appreciated!
 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feat/amazing-feature`)
-3. Commit your Changes (`git commit -m 'feat: ✨ add some amazing-feature'`)
-4. Push to the Branch (`git push origin feat/amazing-feature`)
-5. Open a Pull Request
+See [`CONTRIBUTING.md`](https://github.com/l1asis/birthdays/blob/main/CONTRIBUTING.md) for more information.
 
 ## License
 
